@@ -1,0 +1,104 @@
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+
+const app = express();
+const port = 3000;
+let count = 0;
+
+// Load initial count from file if it exists
+if (fs.existsSync('count.json')) {
+    const data = fs.readFileSync('count.json');
+    count = JSON.parse(data).count;
+}
+
+// Serve static files
+app.use(express.static(path.join(__dirname)));
+app.use(express.json());
+
+app.get('/count', (req, res) => {
+    res.json({ count: count });
+});
+
+app.post('/count', (req, res) => {
+    count = req.body.count;
+    fs.writeFileSync('count.json', JSON.stringify({ count: count }));
+    res.json({ success: true });
+});
+
+app.get('/', (req, res) => {
+    res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Popcat Clicker</title>
+        <style>
+            body {
+                background-image: url('background.jpg');
+                background-size: cover;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+            }
+            .counter {
+                font-size: 2em;
+                margin-bottom: 20px;
+            }
+            img {
+                width: 300px;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="counter" id="counter">0</div>
+        <img src="popcat-closed.jpg" id="popcat" alt="Popcat">
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const popcat = document.getElementById('popcat');
+                const counter = document.getElementById('counter');
+
+                // Load the initial count from the server
+                fetch('/count')
+                    .then(response => response.json())
+                    .then(data => {
+                        counter.innerText = data.count;
+                    });
+
+                popcat.addEventListener('click', () => {
+                    popcat.src = 'popcat-open.jpg';
+
+                    // Increase the count
+                    let count = parseInt(counter.innerText);
+                    count += 1;
+                    counter.innerText = count;
+
+                    // Send the new count to the server
+                    fetch('/count', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ count: count }),
+                    });
+
+                    // Revert the image back after a short delay
+                    setTimeout(() => {
+                        popcat.src = 'popcat-closed.jpg';
+                    }, 200);
+                });
+            });
+        </script>
+    </body>
+    </html>
+    `);
+});
+
+app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
+});
