@@ -199,42 +199,49 @@
         // ----------------------------------------------------
         // 5. 순위 및 전체 카운트 실시간 구독 (메인 로직)
         // ----------------------------------------------------
+
+
         function subscribeToRankings() {
-            // 모든 사용자 문서의 변경을 실시간으로 감지하고 팝 수 기준으로 정렬
             db.collection("users")
-              .orderBy("pops", "desc") // pops 필드를 기준으로 내림차순 정렬
+              .orderBy("pops", "desc")
               .onSnapshot(snapshot => {
-                console.log("순위 구독 - 문서 개수:", snapshot.size);  // ← 이 로그 확인!
+                console.log("순위 구독 - 문서 개수:", snapshot.size);
                 console.log("문서들:", snapshot.docs.map(doc => ({
                     id: doc.id,
-                    data: doc.data()
+                    pops: doc.data().pops
                 })));
+
                 let totalPops = 0;
                 let rankHtml = '';
-                
-                snapshot.forEach((doc, index) => {
+
+                // 핵심: snapshot.docs 사용! (정렬된 순서 보장)
+                snapshot.docs.forEach((doc, index) => {
                     const data = doc.data();
                     const pops = data.pops || 0;
-                    totalPops += pops; // 전체 합산
-                    
-                    if (index < 10) { // TOP 10만 순위표에 표시
+                    totalPops += pops;
+
+                    if (index < 10) {
                         const id = doc.id;
                         const rank = index + 1;
                         rankHtml += `
                             <li>
-                                <span>${rank}. <span class="rank-id">${id}</span></span>
+                                <span class="rank-id">${rank}. ${id}</span>
                                 <span class="rank-pops">${pops.toLocaleString()}</span>
                             </li>
                         `;
                     }
                 });
-                
-                // 전체 클릭 수 표시 업데이트
+
                 totalPopsDisplay.textContent = totalPops.toLocaleString();
-                
-                // TOP 10 리스트 업데이트
                 top10List.innerHTML = rankHtml || '<li>아직 데이터가 없습니다.</li>';
 
+            }, err => {
+                console.error(`Firestore 순위 구독 에러:`, err);
+            });
+        }
+                totalPopsDisplay.textContent = totalPops.toLocaleString();
+                top10List.innerHTML = rankHtml || '<li>아직 데이터가 없습니다.</li>';
+    
             }, err => {
                 console.error(`Firestore 순위 구독 에러:`, err);
             });
@@ -265,6 +272,7 @@
 
 </body>
 </html>
+
 
 
 
