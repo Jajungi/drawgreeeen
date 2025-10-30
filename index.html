@@ -2,92 +2,133 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>멀티플레이 팝캣</title>
     <style>
-        /* CSS 스타일은 이전과 유사하게 유지 */
-        body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: Arial, sans-serif; background-color: #f0f0f0; user-select: none; }
+        /* CSS 스타일: 사용자 인터페이스 */
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            user-select: none;
+        }
         #start-screen { display: flex; flex-direction: column; align-items: center; }
         #game-screen { display: none; text-align: center; }
-        #counter-box { font-size: 3em; margin-bottom: 20px; padding: 10px 20px; background-color: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
-        #popcat-image { width: 300px; height: auto; cursor: pointer; transition: transform 0.05s ease; }
-        #popcat-image:active { transform: scale(0.98); }
-        input, button { padding: 10px; font-size: 1.2em; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
+        #counter-box {
+            font-size: 3.5em; /* 폰트 크기 키움 */
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 그림자 강화 */
+            min-width: 200px; /* 최소 너비 확보 */
+        }
+        #popcat-image {
+            width: 300px;
+            height: auto;
+            cursor: pointer;
+            transition: transform 0.05s ease;
+        }
+        #popcat-image:active {
+            transform: scale(0.98);
+        }
+        input, button { 
+            padding: 12px 20px; /* 패딩 증가 */
+            font-size: 1.1em; 
+            margin-top: 15px; 
+            border-radius: 8px; 
+            border: 1px solid #ccc;
+            cursor: pointer;
+        }
     </style>
+
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
 </head>
 <body>
 
     <div id="start-screen">
-        <h2>팝캣에 참여할 ID를 입력하세요</h2>
-        <input type="text" id="user-id" placeholder="나만의 ID">
-        <button onclick="startGame()">게임 시작</button>
-        <p style="margin-top: 20px;">* 클릭 횟수는 이 ID에 누적됩니다.</p>
+        <h2>팝캣 월드에 오신 것을 환영합니다!</h2>
+        <input type="text" id="user-id" placeholder="나만의 ID를 입력하세요">
+        <button id="start-button">게임 시작</button> 
+        <p style="margin-top: 20px; color: #666;">* 클릭 횟수는 이 ID에 누적됩니다.</p>
     </div>
 
     <div id="game-screen">
         <div id="counter-box">0</div>
         <p>당신의 ID: <strong id="current-user-id"></strong></p>
         <img id="popcat-image" src="귀엽다.png" alt="팝캣">
-        <div class="instruction">마우스 클릭 또는 스페이스바를 누르세요!</div>
+        <div class="instruction" style="color:#444;">마우스 클릭 또는 스페이스바를 누르세요!</div>
     </div>
     
     <audio id="pop-sound" src="pop.mp3" preload="auto"></audio> 
-
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
 
     <script>
         // ----------------------------------------------------
         // 1. Firebase 설정 초기화
         // ----------------------------------------------------
         
-        // 🚨 중요: 1단계에서 얻은 Firebase 설정 코드를 여기에 붙여넣으세요
+        // ⚠️ 이 부분을 반드시 사용자님의 실제 Firebase 설정 코드로 대체하세요!
         const firebaseConfig = {
-          apiKey: "AIzaSyA6OwwtJNtTqujb6PW6nolYmstOj7zBqCA",
+          apiKey: "AIzaSyA6OwwtJNtTqujb6PW6nolYmstOj7zBqCA", 
           authDomain: "drawgreen-3bc38.firebaseapp.com",
           projectId: "drawgreen-3bc38",
           storageBucket: "drawgreen-3bc38.firebasestorage.app",
           messagingSenderId: "1050500469107",
-          appId: "1:1050500469107:web:6c25e893e7c12500f23506",
-          measurementId: "G-M3TK20VTL6"
+          appId: "1:1050500469107:web:6c25e893e7c12500f23506"
+        };
 
         // Firebase 초기화
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
         // ----------------------------------------------------
-        // 2. 게임 로직 변수
+        // 2. 게임 로직 변수 및 DOM 요소
         // ----------------------------------------------------
         const catImage = document.getElementById('popcat-image');
         const counterBox = document.getElementById('counter-box');
-        const closedImage = '귀엽다.png';
-        const openImage = '귀엽다2.png';
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const userIdInput = document.getElementById('user-id');
+        const startButton = document.getElementById('start-button');
+        const currentUserDisplay = document.getElementById('current-user-id');
         const sound = document.getElementById('pop-sound');
         
         let currentUserId = null;
+        const closedImage = '귀엽다.png';
+        const openImage = '귀엽다2.png';
 
         // ----------------------------------------------------
-        // 3. ID 입력 및 게임 시작
+        // 3. ID 입력 및 게임 시작 (에러 3 해결: onclick 대신 이벤트 리스너 사용)
         // ----------------------------------------------------
         function startGame() {
-            const userIdInput = document.getElementById('user-id').value.trim();
-            if (userIdInput) {
-                currentUserId = userIdInput;
-                document.getElementById('current-user-id').textContent = currentUserId;
-                document.getElementById('start-screen').style.display = 'none';
-                document.getElementById('game-screen').style.display = 'block';
+            const userId = userIdInput.value.trim();
+            if (userId) {
+                currentUserId = userId;
+                currentUserDisplay.textContent = currentUserId;
+                startScreen.style.display = 'none';
+                gameScreen.style.display = 'block';
                 
-                // Firestore에서 실시간으로 카운트 업데이트를 구독
+                // Firestore에서 실시간으로 카운트 업데이트 구독 시작
                 subscribeToTotalCount();
             } else {
                 alert("ID를 입력해 주세요.");
             }
         }
 
+        // 시작 버튼에 이벤트 리스너 연결
+        startButton.addEventListener('click', startGame);
+
         // ----------------------------------------------------
         // 4. 클릭 처리 및 데이터베이스 업데이트
         // ----------------------------------------------------
         async function handlePop() {
-            if (!currentUserId) return; // ID 없으면 작동 안 함
+            if (!currentUserId) return; // ID 없으면 실행 안 함
 
             // 이미지 및 소리 변경 (프론트엔드 반응)
             catImage.src = openImage;
@@ -104,9 +145,11 @@
                 // 현재 ID의 팝 카운트를 1 증가 (없으면 1로 생성)
                 await userRef.set({
                     pops: firebase.firestore.FieldValue.increment(1)
-                }, { merge: true }); // merge: true를 사용하여 기존 필드 덮어쓰지 않음
+                }, { merge: true });
             } catch (error) {
-                console.error("클릭 카운트 업데이트 실패: ", error);
+                console.error("클릭 카운트 업데이트 실패:", error);
+                // 오류 발생 시 사용자에게 알림
+                // alert("클릭 카운트 업데이트에 실패했습니다. 콘솔을 확인하세요.");
             }
         }
 
@@ -122,15 +165,16 @@
                 // 총합을 화면에 표시
                 counterBox.textContent = totalPops.toLocaleString();
             }, err => {
-                console.log(`구독 에러: ${err}`);
+                console.error(`Firestore 구독 에러:`, err);
             });
         }
 
-        // 6. 이벤트 리스너 등록
+        // 6. 이벤트 리스너 등록 (키보드 및 마우스)
         catImage.addEventListener('mousedown', handlePop);
         document.addEventListener('keydown', (e) => {
+            // 스페이스바(e.code === 'Space')만 작동하도록 설정
             if (e.code === 'Space' && !e.repeat && currentUserId) {
-                e.preventDefault();
+                e.preventDefault(); // 스크롤 방지
                 handlePop();
             }
         });
@@ -139,4 +183,3 @@
 
 </body>
 </html>
-
