@@ -200,21 +200,13 @@
         // 5. 순위 및 전체 카운트 실시간 구독 (메인 로직)
         // ----------------------------------------------------
 
-
         function subscribeToRankings() {
             db.collection("users")
               .orderBy("pops", "desc")
               .onSnapshot(snapshot => {
-                console.log("순위 구독 - 문서 개수:", snapshot.size);
-                console.log("문서들:", snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    pops: doc.data().pops
-                })));
-
                 let totalPops = 0;
                 let rankHtml = '';
 
-                // 핵심: snapshot.docs 사용! (정렬된 순서 보장)
                 snapshot.docs.forEach((doc, index) => {
                     const data = doc.data();
                     const pops = data.pops || 0;
@@ -235,13 +227,6 @@
                 totalPopsDisplay.textContent = totalPops.toLocaleString();
                 top10List.innerHTML = rankHtml || '<li>아직 데이터가 없습니다.</li>';
 
-            }, err => {
-                console.error(`Firestore 순위 구독 에러:`, err);
-            });
-        }
-                totalPopsDisplay.textContent = totalPops.toLocaleString();
-                top10List.innerHTML = rankHtml || '<li>아직 데이터가 없습니다.</li>';
-    
             }, err => {
                 console.error(`Firestore 순위 구독 에러:`, err);
             });
@@ -272,6 +257,7 @@
 
 </body>
 </html>
+
 
 
 
