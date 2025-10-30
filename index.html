@@ -3,30 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>멀티플레이 초록록</title>
+    <title>멀티플레이 초록그림림</title>
     <style>
-        /* CSS 스타일: 사용자 인터페이스 */
         body {
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             height: 100vh;
             margin: 0;
             font-family: Arial, sans-serif;
             background-color: #f0f0f0;
             user-select: none;
+            position: relative; /* 절대 위치 배치를 위한 기준점 */
         }
+
+        /* 전체 순위 섹션 스타일 */
+        #ranking-section {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            min-width: 250px;
+        }
+        #total-pops-display {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        #top-10-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 0.95em;
+        }
+        #top-10-list li {
+            margin: 4px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        #top-10-list .rank-id {
+            font-weight: bold;
+        }
+        #top-10-list .rank-pops {
+            color: #007bff;
+        }
+
+        /* 게임 화면 스타일 */
         #start-screen { display: flex; flex-direction: column; align-items: center; }
         #game-screen { display: none; text-align: center; }
-        #counter-box {
-            font-size: 3.5em; /* 폰트 크기 키움 */
-            margin-bottom: 20px;
-            padding: 10px 20px;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 그림자 강화 */
-            min-width: 200px; /* 최소 너비 확보 */
+        #my-pops-display { /* 개인 클릭 수 */
+            font-size: 3.5em; 
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #d9534f; /* 눈에 띄는 색상 */
         }
         #popcat-image {
             width: 300px;
@@ -34,11 +69,9 @@
             cursor: pointer;
             transition: transform 0.05s ease;
         }
-        #popcat-image:active {
-            transform: scale(0.98);
-        }
+        #popcat-image:active { transform: scale(0.98); }
         input, button { 
-            padding: 12px 20px; /* 패딩 증가 */
+            padding: 12px 20px;
             font-size: 1.1em; 
             margin-top: 15px; 
             border-radius: 8px; 
@@ -51,19 +84,28 @@
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
 </head>
 <body>
+    
+    <div id="ranking-section">
+        <h3>🏆 전체 클릭 수</h3>
+        <div id="total-pops-display">로딩 중...</div>
+        <hr>
+        <h4>TOP 10 순위표</h4>
+        <ul id="top-10-list">
+            </ul>
+    </div>
 
     <div id="start-screen">
-        <h2>초록 때리기기</h2>
+        <h2>초록 때리기</h2>
         <input type="text" id="user-id" placeholder="나만의 ID를 입력하세요">
         <button id="start-button">게임 시작</button> 
         <p style="margin-top: 20px; color: #666;">* 클릭 횟수는 이 ID에 누적됩니다.</p>
     </div>
 
     <div id="game-screen">
-        <div id="counter-box">0</div>
-        <p>당신의 ID: <strong id="current-user-id"></strong></p>
+        <p style="font-size:1.2em; margin-bottom: 5px;">내 클릭 수</p>
+        <div id="my-pops-display">0</div>
         <img id="popcat-image" src="귀엽다.png" alt="팝캣">
-        <div class="instruction" style="color:#444;">마우스 클릭 또는 스페이스바를 누르세요!</div>
+        <div class="instruction" style="color:#444; margin-top: 10px;">당신의 ID: <strong id="current-user-id"></strong></div>
     </div>
     
     //<audio id="pop-sound" src="pop.mp3" preload="auto"></audio> 
@@ -83,15 +125,16 @@
           appId: "1:1050500469107:web:6c25e893e7c12500f23506"
         };
 
-        // Firebase 초기화
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
         // ----------------------------------------------------
-        // 2. 게임 로직 변수 및 DOM 요소
+        // 2. DOM 요소 및 변수
         // ----------------------------------------------------
         const catImage = document.getElementById('popcat-image');
-        const counterBox = document.getElementById('counter-box');
+        const myPopsDisplay = document.getElementById('my-pops-display'); // 내 클릭 수 표시
+        const totalPopsDisplay = document.getElementById('total-pops-display'); // 전체 클릭 수 표시
+        const top10List = document.getElementById('top-10-list'); // TOP 10 리스트
         const startScreen = document.getElementById('start-screen');
         const gameScreen = document.getElementById('game-screen');
         const userIdInput = document.getElementById('user-id');
@@ -104,7 +147,7 @@
         const openImage = '귀엽다2.png';
 
         // ----------------------------------------------------
-        // 3. ID 입력 및 게임 시작 (에러 3 해결: onclick 대신 이벤트 리스너 사용)
+        // 3. ID 입력 및 게임 시작
         // ----------------------------------------------------
         function startGame() {
             const userId = userIdInput.value.trim();
@@ -114,73 +157,108 @@
                 startScreen.style.display = 'none';
                 gameScreen.style.display = 'block';
                 
-                // Firestore에서 실시간으로 카운트 업데이트 구독 시작
-                subscribeToTotalCount();
+                // 순위 및 전체 카운트 구독 시작 (로그인과 무관하게 실행)
+                subscribeToRankings(); 
+
+                // 내 클릭 수 구독 시작
+                subscribeToMyPops();
             } else {
                 alert("ID를 입력해 주세요.");
             }
         }
-
-        // 시작 버튼에 이벤트 리스너 연결
         startButton.addEventListener('click', startGame);
 
         // ----------------------------------------------------
         // 4. 클릭 처리 및 데이터베이스 업데이트
         // ----------------------------------------------------
         async function handlePop() {
-            if (!currentUserId) return; // ID 없으면 실행 안 함
+            if (!currentUserId) return;
 
             // 이미지 및 소리 변경 (프론트엔드 반응)
             catImage.src = openImage;
             if (sound) { sound.currentTime = 0; sound.play(); }
+            setTimeout(() => { catImage.src = closedImage; }, 80);
 
-            setTimeout(() => {
-                catImage.src = closedImage;
-            }, 80);
-
-            // 데이터베이스 업데이트 (트랜잭션으로 안전하게 증가)
             const userRef = db.collection("users").doc(currentUserId);
             
             try {
-                // 현재 ID의 팝 카운트를 1 증가 (없으면 1로 생성)
+                // 현재 ID의 팝 카운트를 1 증가
                 await userRef.set({
                     pops: firebase.firestore.FieldValue.increment(1)
                 }, { merge: true });
             } catch (error) {
                 console.error("클릭 카운트 업데이트 실패:", error);
-                // 오류 발생 시 사용자에게 알림
-                // alert("클릭 카운트 업데이트에 실패했습니다. 콘솔을 확인하세요.");
             }
         }
-
-        // 5. 실시간 총 카운트 구독
-        function subscribeToTotalCount() {
-            // 모든 사용자 문서의 변경을 실시간으로 감지
-            db.collection("users").onSnapshot(snapshot => {
-                let totalPops = 0;
-                snapshot.forEach(doc => {
-                    // 각 문서(ID)의 pops 값을 합산
-                    totalPops += doc.data().pops || 0;
-                });
-                // 총합을 화면에 표시
-                counterBox.textContent = totalPops.toLocaleString();
-            }, err => {
-                console.error(`Firestore 구독 에러:`, err);
-            });
-        }
-
-        // 6. 이벤트 리스너 등록 (키보드 및 마우스)
         catImage.addEventListener('mousedown', handlePop);
         document.addEventListener('keydown', (e) => {
-            // 스페이스바(e.code === 'Space')만 작동하도록 설정
             if (e.code === 'Space' && !e.repeat && currentUserId) {
-                e.preventDefault(); // 스크롤 방지
+                e.preventDefault(); 
                 handlePop();
             }
         });
+
+        // ----------------------------------------------------
+        // 5. 순위 및 전체 카운트 실시간 구독 (메인 로직)
+        // ----------------------------------------------------
+        function subscribeToRankings() {
+            // 모든 사용자 문서의 변경을 실시간으로 감지하고 팝 수 기준으로 정렬
+            db.collection("users")
+              .orderBy("pops", "desc") // pops 필드를 기준으로 내림차순 정렬
+              .onSnapshot(snapshot => {
+                let totalPops = 0;
+                let rankHtml = '';
+                
+                snapshot.forEach((doc, index) => {
+                    const data = doc.data();
+                    const pops = data.pops || 0;
+                    totalPops += pops; // 전체 합산
+                    
+                    if (index < 10) { // TOP 10만 순위표에 표시
+                        const id = doc.id;
+                        const rank = index + 1;
+                        rankHtml += `
+                            <li>
+                                <span>${rank}. <span class="rank-id">${id}</span></span>
+                                <span class="rank-pops">${pops.toLocaleString()}</span>
+                            </li>
+                        `;
+                    }
+                });
+                
+                // 전체 클릭 수 표시 업데이트
+                totalPopsDisplay.textContent = totalPops.toLocaleString();
+                
+                // TOP 10 리스트 업데이트
+                top10List.innerHTML = rankHtml || '<li>아직 데이터가 없습니다.</li>';
+
+            }, err => {
+                console.error(`Firestore 순위 구독 에러:`, err);
+            });
+        }
         
+        // ----------------------------------------------------
+        // 6. 내 클릭 수 실시간 구독
+        // ----------------------------------------------------
+        function subscribeToMyPops() {
+            // 현재 로그인된 사용자 ID의 문서만 실시간으로 구독
+            db.collection("users").doc(currentUserId)
+              .onSnapshot(doc => {
+                if (doc.exists) {
+                    const myPops = doc.data().pops || 0;
+                    myPopsDisplay.textContent = myPops.toLocaleString();
+                } else {
+                    // 새 사용자인 경우
+                    myPopsDisplay.textContent = '0';
+                }
+              }, err => {
+                console.error(`내 클릭 수 구독 에러:`, err);
+              });
+        }
+        
+        // 게임 시작 전에도 순위는 보여줍니다.
+        subscribeToRankings(); 
     </script>
 
 </body>
 </html>
-
