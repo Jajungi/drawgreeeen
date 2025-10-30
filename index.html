@@ -204,6 +204,11 @@
             db.collection("users")
               .orderBy("pops", "desc") // pops 필드를 기준으로 내림차순 정렬
               .onSnapshot(snapshot => {
+                console.log("순위 구독 - 문서 개수:", snapshot.size);  // ← 이 로그 확인!
+                console.log("문서들:", snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    data: doc.data()
+                })));
                 let totalPops = 0;
                 let rankHtml = '';
                 
@@ -260,5 +265,6 @@
 
 </body>
 </html>
+
 
 
