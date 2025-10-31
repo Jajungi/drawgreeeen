@@ -398,14 +398,17 @@
                     .limit(10)
                     .get();
 
-                // 2. 전체 합계 계산을 위한 전체 데이터 가져오기 
+                // 2. 전체 합계 계산을 위한 전체 데이터 가져오기 (쿼리 분리)
                 const totalSnapshot = await db.collection("users").get();
                 
-                totalSnapshot.docs.forEach(doc => {
-                    // 🚨 NaN 방지
-                    totalPops += Number(doc.data().pops) || 0; 
-                });
-
+                // 🚨 쿼리가 성공적으로 데이터를 반환했는지 확인 후 합산
+                if (totalSnapshot && totalSnapshot.docs) {
+                    totalSnapshot.docs.forEach(doc => {
+                        // NaN 방지
+                        totalPops += Number(doc.data().pops) || 0; 
+                    });
+                }
+                
                 // 3. 총합 애니메이션 적용
                 updateNumberSmooth(totalPopsValue, totalPops);
                 
@@ -418,7 +421,10 @@
                 
             } catch (err) {
                 console.error("Firestore 순위 업데이트 오류:", err);
-                // 오류 발생 시 초기 로딩 메시지 유지
+                
+                // 오류 발생 시 전체 합계를 0으로 처리하여 표시
+                updateNumberSmooth(totalPopsValue, 0); 
+
                 if (top10List.children.length === 0) {
                      top10List.innerHTML = '<li>순위 로딩 오류 (콘솔 확인)</li>';
                 }
