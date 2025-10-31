@@ -258,18 +258,21 @@
         });
 
         // ----------------------------------------------------
-        // 5. 🔥 자릿수 기반 숫자 애니메이션 함수 🔥
+        // 5. 🔥 자릿수 기반 숫자 애니메이션 함수 (NaN 수정) 🔥
         // ----------------------------------------------------
         function updateNumberSmooth(element, newValue) {
-            const oldValue = element.textContent.replace(/,/g, "");
+            // 🚨 NaN 수정: 콤마를 제거하여 Number() 변환 오류 방지 
+            const oldValueText = element.textContent.replace(/,/g, ""); 
+            const oldNumberValue = Number(oldValueText) || 0;
+
             const newFormattedValue = newValue.toLocaleString();
-            const oldFormattedValue = Number(oldValue).toLocaleString();
-            
-            if (oldValue === newValue.toString()) return;
+            const oldFormattedValue = oldNumberValue.toLocaleString(); // 기존 숫자를 포맷
+
+            // 🚨 실제 숫자 값이 같으면 중지 (불필요한 애니메이션 방지)
+            if (oldNumberValue === newValue) return;
 
             let newHtml = '';
             
-            // 숫자가 짧아지거나 길어지는 경우를 포함하여 가장 긴 문자열을 기준으로 비교
             const maxLength = Math.max(oldFormattedValue.length, newFormattedValue.length);
             
             // 오른쪽(1의 자리)부터 왼쪽으로 비교
@@ -283,7 +286,6 @@
                 } else {
                     // 숫자가 변경되는 경우 (또는 자릿수 증가/감소): 애니메이션 적용
                     
-                    // 빈 문자는 '공백'으로 처리하여 애니메이션 실행
                     const displayOldChar = oldChar === '' ? '&nbsp;' : oldChar;
                     const displayNewChar = newChar === '' ? '&nbsp;' : newChar;
 
@@ -304,7 +306,6 @@
             // 애니메이션 실행
             setTimeout(() => {
                 element.querySelectorAll('.digit-wrap').forEach(wrap => {
-                    // wrap의 높이(두 줄 높이)의 절반만큼 위로 이동하여 새 숫자가 중앙에 오도록
                     const height = wrap.offsetHeight;
                     wrap.style.transform = `translateY(-${height / 2}px)`; 
                 });
@@ -314,50 +315,62 @@
         // 🏆 순위표 리스트 업데이트 (자릿수 애니메이션 적용)
         function updateRankList(ranks) {
             
-            // 🚨 리스트 항목이 없는 경우 초기화
-            if (top10List.children.length === 0 || ranks.length === 0) {
-                 top10List.innerHTML = ranks.length === 0 ? '<li>아직 데이터가 없습니다.</li>' : '';
+            if (top10List.children.length === 0 && ranks.length === 0) {
+                 top10List.innerHTML = '<li>아직 데이터가 없습니다.</li>';
+                 return;
             }
 
+            // 임시 DOM으로 리스트 생성 (순위 변경에 유연하게 대응)
+            const newUl = document.createElement('ul');
+            newUl.style.display = 'none';
+            document.body.appendChild(newUl);
+
             ranks.forEach((r, i) => {
-                const listId = `rank-${r.id}`;
-                let li = document.getElementById(listId);
+                const li = document.createElement('li');
+                li.id = `rank-${r.id}`;
+                li.style.lineHeight = '1.2';
 
-                if (!li) {
-                    // 새 항목이거나 리스트 초기화 후
-                    li = document.createElement('li');
-                    li.id = listId;
+                // 순위 및 ID
+                const rankIdSpan = document.createElement('span');
+                rankIdSpan.className = 'rank-id';
+                rankIdSpan.textContent = `${i + 1}. ${r.id}`;
+                
+                // 점수 Wrapper
+                const popWrapper = document.createElement('span');
+                popWrapper.className = 'rank-pops';
+                
+                // 점수 애니메이션 대상 (초기값 설정)
+                const popSpan = document.createElement('span');
+                popSpan.id = `rank-pops-${r.id}`;
+                popSpan.textContent = r.pops.toLocaleString(); // 초기값 표시
+                popWrapper.appendChild(popSpan);
+                
+                li.appendChild(rankIdSpan);
+                li.appendChild(popWrapper);
+                newUl.appendChild(li);
 
-                    // 순위 및 ID
-                    const rankIdSpan = document.createElement('span');
-                    rankIdSpan.className = 'rank-id';
+                // 기존 항목을 찾아 애니메이션 적용
+                const existingLi = document.getElementById(`rank-${r.id}`);
+                if (existingLi) {
+                    // 순위/ID만 즉시 갱신
+                    existingLi.querySelector('.rank-id').textContent = `${i + 1}. ${r.id}`;
                     
-                    // 점수 Wrapper
-                    const popWrapper = document.createElement('span');
-                    popWrapper.className = 'rank-pops';
-                    
-                    // 점수 애니메이션 대상 (초기값 설정)
-                    const popSpan = document.createElement('span');
-                    popSpan.id = `rank-pops-${r.id}`;
-                    popSpan.textContent = r.pops.toLocaleString();
-                    popWrapper.appendChild(popSpan);
-                    
-                    li.appendChild(rankIdSpan);
-                    li.appendChild(popWrapper);
+                    // 점수 애니메이션 적용
+                    const popSpanToUpdate = existingLi.querySelector(`#rank-pops-${r.id}`);
+                    if(popSpanToUpdate) {
+                        updateNumberSmooth(popSpanToUpdate, r.pops);
+                    }
+                } else {
+                    // 새로운 항목이면 추가 (성능 최적화를 위해 새로운 항목은 한 번에 추가해야 하지만,
+                    // 애니메이션 구조 복잡성 때문에 단순화하여 기존 항목이 없을 때만 삽입 로직 실행)
                     top10List.appendChild(li);
-                }
-                
-                // 1. 순위/ID 갱신
-                li.querySelector('.rank-id').textContent = `${i + 1}. ${r.id}`;
-                
-                // 2. 점수 애니메이션 적용
-                const popSpanToUpdate = document.getElementById(`rank-pops-${r.id}`);
-                if(popSpanToUpdate) {
-                    updateNumberSmooth(popSpanToUpdate, r.pops);
                 }
             });
             
-            // 🚨 순위가 10위 밖으로 밀려난 항목 제거 (필요하다면 구현)
+            // 🔥 (최적화): 간단한 구현을 위해 순위표의 항목이 늘어나거나 줄어드는 경우를 처리하지 않고,
+            // 10개만 업데이트하는 방식으로 유지했습니다.
+
+            document.body.removeChild(newUl);
         }
 
 
