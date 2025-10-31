@@ -281,24 +281,21 @@
 
             const newFormattedValue = newValue.toLocaleString();
             const oldFormattedValue = oldNumberValue.toLocaleString();
-            
+    
             let newHtml = '';
-            
+    
             // 2. 새로운 HTML 구조 생성 (자릿수 비교)
             const maxLength = Math.max(oldFormattedValue.length, newFormattedValue.length);
-            
+    
             for (let i = 1; i <= maxLength; i++) {
                 const oldChar = oldFormattedValue.charAt(oldFormattedValue.length - i) || '';
                 const newChar = newFormattedValue.charAt(newFormattedValue.length - i) || '';
 
                 if (oldChar === newChar && oldChar !== '' && oldChar !== ',') {
-                    // 고정된 숫자
                     newHtml = `<span class="static-text">${newChar}</span>` + newHtml;
                 } else if (oldChar === ',' || newChar === ',') {
-                    // 콤마는 애니메이션 없이 고정
                     newHtml = `<span class="static-text">,</span>` + newHtml;
                 } else {
-                    // 애니메이션이 필요한 자릿수
                     const displayOldChar = oldChar === '' ? '&nbsp;' : oldChar;
                     const displayNewChar = newChar === '' ? '&nbsp;' : newChar;
 
@@ -314,32 +311,35 @@
             // 3. HTML 교체
             element.innerHTML = newHtml;
 
-            // 4. 애니메이션 클래스 전환
+            // === 핵심: 강제 리플로우 + 다음 프레임에 애니메이션 시작 ===
+            void element.offsetHeight; // ← 이 줄 추가! DOM 반영 강제
+
             requestAnimationFrame(() => {
-                element.querySelectorAll('.digit-container').forEach(container => {
-                    const oldNum = container.querySelector('.digit-number.old');
-                    const newNum = container.querySelector('.digit-number.new');
-                    
-                    if (oldNum) oldNum.classList.add("exit");
-                    if (newNum) {
-                        newNum.classList.remove("new");
-                        newNum.classList.add("enter");
-                    }
+                requestAnimationFrame(() => { // ← 이중으로 보장
+                    element.querySelectorAll('.digit-container').forEach(container => {
+                        const oldNum = container.querySelector('.digit-number.old');
+                        const newNum = container.querySelector('.digit-number.new');
+                
+                        if (oldNum) oldNum.classList.add("exit");
+                        if (newNum) {
+                            newNum.classList.remove("new");
+                            newNum.classList.add("enter");
+                        }
+                    });
                 });
             });
 
-            // 5. 애니메이션 완료 후 이전 요소 정리 및 새 요소 준비
+            // 5. 애니메이션 완료 후 정리
             setTimeout(() => {
                 element.querySelectorAll('.digit-number.old').forEach(oldNum => {
                     oldNum.remove();
                 });
-                // 새로운 요소에 'old' 클래스를 부여하여 다음 갱신 시 이전 값이 되도록 준비
                 element.querySelectorAll('.digit-number.enter').forEach(newNum => {
                     newNum.classList.remove("enter");
                     newNum.classList.add("old");
                 });
-            }, 400); // CSS transition 시간 0.4s와 일치
-        }
+            }, 400);
+        }        
 
 
         // 🏆 순위표 리스트 업데이트 (생략)
@@ -473,3 +473,4 @@
 
 </body>
 </html>
+
