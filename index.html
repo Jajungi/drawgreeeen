@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>멀티플레이 초록그림 (쉼표 제거 + 애니메이션 안정화)</title>
+    <title>초록 때리기 (클릭 시 5초 복귀 보장)</title>
     <style>
         body {
             display: flex;
@@ -156,6 +156,7 @@
                 startScreen.style.display = 'none';
                 gameScreen.style.display = 'block';
                 await loadMyPopsInitial();
+                startPolling(); // 폴링 시작
             } else {
                 alert("ID를 입력해 주세요.");
             }
@@ -166,38 +167,56 @@
             try {
                 const doc = await db.collection("users").doc(currentUserId).get();
                 localPops = doc.exists ? Number(doc.data().pops) || 0 : 0;
-                myPopsDisplay.textContent = localPops;  // 쉼표 없음
+                myPopsDisplay.textContent = localPops;
             } catch (err) {
                 console.error(`내 클릭 수 로드 에러:`, err);
             }
         }
 
         // ----------------------------------------------------
-        // 4. 클릭 처리
+        // 4. 폴링 시작 함수 (재사용 가능)
+        // ----------------------------------------------------
+        function startPolling() {
+            clearInterval(rankingsInterval);
+            currentPollingInterval = 5000;
+            rankingsInterval = setInterval(updateRankings, 5000);
+            updateRankings(); // 즉시 한 번 실행
+        }
+
+        // ----------------------------------------------------
+        // 5. 클릭 처리 → 무조건 5초 복귀
         // ----------------------------------------------------
         async function handlePop() {
             if (!currentUserId) return;
+
+            // 애니메이션
             catImage.src = openImage;
             setTimeout(() => { catImage.src = closedImage; }, 80);
-            localPops++;
-            myPopsDisplay.textContent = localPops;  // 바로 갱신
 
+            // 로컬 카운트 증가
+            localPops++;
+            myPopsDisplay.textContent = localPops;
+
+            // Firestore 증가
             const userRef = db.collection("users").doc(currentUserId);
             try {
                 await userRef.set({
                     pops: firebase.firestore.FieldValue.increment(1)
                 }, { merge: true });
             } catch (error) {
-                console.error("클릭 카운트 업데이트 실패:", error);
+                console.error("클릭 업데이트 실패:", error);
             }
 
+            // ★ 클릭 시간 갱신 + 무조건 5초 폴링 재시작 ★
             lastClickTime = Date.now();
             if (currentPollingInterval !== 5000) {
-                clearInterval(rankingsInterval);
-                currentPollingInterval = 5000;
-                rankingsInterval = setInterval(updateRankings, 5000);
+                startPolling(); // 강제 5초 재시작
             }
+
+            // 선택적: 클릭 즉시 순위 갱신 (더 빠른 반영 원하면 주석 해제)
+            // updateRankings();
         }
+
         catImage.addEventListener('mousedown', handlePop);
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && !e.repeat && currentUserId) {
@@ -207,7 +226,7 @@
         });
 
         // ----------------------------------------------------
-        // 5. 숫자 애니메이션 (쉼표 없이!)
+        // 6. 숫자 애니메이션 (쉼표 없음)
         // ----------------------------------------------------
         function updateNumberSmooth(element, newValue) {
             const oldText = element.textContent || "0";
@@ -261,7 +280,7 @@
         }
 
         // ----------------------------------------------------
-        // 6. 순위표 업데이트
+        // 7. 순위표 업데이트
         // ----------------------------------------------------
         function updateRankList(ranks) {
             if (ranks.length === 0) {
@@ -316,7 +335,7 @@
         }
 
         // ----------------------------------------------------
-        // 7. 순위 및 전체 클릭 수 업데이트
+        // 8. 순위 및 전체 클릭 수 업데이트
         // ----------------------------------------------------
         async function updateRankings() {
             let totalPops = 0;
@@ -339,6 +358,7 @@
                 });
                 updateRankList(ranks);
 
+                // ★ 20초 동안 클릭 없으면 60초로 느려짐 ★
                 if (Date.now() - lastClickTime > 20000 && currentPollingInterval !== 60000) {
                     clearInterval(rankingsInterval);
                     currentPollingInterval = 60000;
@@ -346,20 +366,17 @@
                 }
 
             } catch (err) {
-                console.error("Firestore 순위 업데이트 오류:", err);
+                console.error("Firestore 오류:", err);
                 updateNumberSmooth(totalPopsValue, 0);
                 if (top10List.children.length === 0) {
-                    top10List.innerHTML = '<li>순위 로딩 오류</li>';
+                    top10List.innerHTML = '<li>로딩 오류</li>';
                 }
             }
         }
 
         // ----------------------------------------------------
-        // 8. 시작
+        // 9. 초기 실행
         // ----------------------------------------------------
-        updateRankings();
-        rankingsInterval = setInterval(updateRankings, 5000);
-
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 totalPopsValue.textContent = "0";
