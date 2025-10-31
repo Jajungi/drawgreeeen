@@ -169,23 +169,30 @@
         // ----------------------------------------------------
         // 4. 클릭 처리 및 데이터베이스 업데이트
         // ----------------------------------------------------
+        let localPops = 0;
+        let lastSynced = 0;
+
         async function handlePop() {
             if (!currentUserId) return;
 
-            // 이미지 및 소리 변경 (프론트엔드 반응)
             catImage.src = openImage;
             if (sound) { sound.currentTime = 0; sound.play(); }
             setTimeout(() => { catImage.src = closedImage; }, 80);
 
-            const userRef = db.collection("users").doc(currentUserId);
-            
-            try {
-                // 현재 ID의 팝 카운트를 1 증가
-                await userRef.set({
-                    pops: firebase.firestore.FieldValue.increment(1)
-                }, { merge: true });
-            } catch (error) {
-                console.error("클릭 카운트 업데이트 실패:", error);
+            localPops++;
+            myPopsDisplay.textContent = localPops.toLocaleString();
+
+            // 10회마다 Firestore에 한 번만 반영
+            if (localPops - lastSynced >= 10) {
+                const userRef = db.collection("users").doc(currentUserId);
+                try {
+                    await userRef.set({
+                        pops: firebase.firestore.FieldValue.increment(localPops - lastSynced)
+                    }, { merge: true });
+                    lastSynced = localPops;
+                } catch (error) {
+                    console.error("클릭 카운트 업데이트 실패:", error);
+                }
             }
         }
         catImage.addEventListener('mousedown', handlePop);
@@ -235,28 +242,48 @@
         // ----------------------------------------------------
         // 6. 내 클릭 수 실시간 구독
         // ----------------------------------------------------
-        function subscribeToMyPops() {
-            // 현재 로그인된 사용자 ID의 문서만 실시간으로 구독
-            db.collection("users").doc(currentUserId)
-              .onSnapshot(doc => {
-                if (doc.exists) {
-                    const myPops = doc.data().pops || 0;
-                    myPopsDisplay.textContent = myPops.toLocaleString();
-                } else {
-                    // 새 사용자인 경우
-                    myPopsDisplay.textContent = '0';
+        function subscribeToRankings() {
+            async function loadRankingsOnce() {
+                try {
+                    const snapshot = await db.collection("users")
+                        .orderBy("pops", "desc")
+                        .limit(10)
+                        .get();
+
+                    let totalPops = 0;
+                    let rankHtml = '';
+
+                    snapshot.docs.forEach((doc, index) => {
+                        const data = doc.data();
+                        const pops = data.pops || 0;
+                        totalPops += pops;
+                        const id = doc.id;
+                        rankHtml += `
+                            <li>
+                                <span class="rank-id">${index + 1}. ${id}</span>
+                                <span class="rank-pops">${pops.toLocaleString()}</span>
+                            </li>
+                        `;
+                    });
+
+                    totalPopsDisplay.textContent = totalPops.toLocaleString();
+                    top10List.innerHTML = rankHtml || '<li>아직 데이터가 없습니다.</li>';
+                } catch (err) {
+                    console.error("순위 불러오기 오류:", err);
                 }
-              }, err => {
-                console.error(`내 클릭 수 구독 에러:`, err);
-              });
+            }
+
+            // 5초마다 갱신
+            loadRankingsOnce();
+            setInterval(loadRankingsOnce, 5000);
         }
-        
         // 게임 시작 전에도 순위는 보여줍니다.
         subscribeToRankings(); 
     </script>
 
 </body>
 </html>
+
 
 
 
