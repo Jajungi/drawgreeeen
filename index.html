@@ -61,6 +61,11 @@
             font-size: 1.5em; font-weight: bold; color: #333;
             margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;
         }
+        #total-pops-value {
+            min-width: 50px; /* 숫자가 길어질 때 깜빡임 방지 */
+            display: inline-block;
+            text-align: right;
+        }
         #top-10-list { list-style: none; padding: 0; margin: 0; font-size: 0.95em; }
         #top-10-list li { margin: 4px 0; display: flex; justify-content: space-between; line-height: 1.2; }
         #top-10-list .rank-id { font-weight: bold; }
@@ -80,6 +85,9 @@
         }
         #my-pops-display {
             line-height: 1.2;
+            min-width: 50px; /* 숫자가 길어질 때 깜빡임 방지 */
+            display: inline-block;
+            text-align: center;
         }
 
         #popcat-image { width: 300px; height: auto; cursor: pointer; transition: transform 0.05s ease; }
@@ -99,7 +107,7 @@
     <div id="ranking-section">
         <h3>전체 클릭 수</h3>
         <div id="total-pops-display">
-            <div id="total-pops-value" style="display:inline-block;">로딩 중...</div>
+            <div id="total-pops-value">로딩 중...</div>
         </div>
         <hr>
         <h4>TOP 10 순위표</h4>
@@ -118,7 +126,7 @@
         <div id="my-pops-display-wrapper">
             <span id="my-pops-display">0</span>
         </div>
-        <img id="popcat-image" src="귀엽다.png" alt="팝캣">
+        <img id="popcat-image" src="https://via.placeholder.com/300x200/00FF00/FFFFFF?text=귀엽다" alt="팝캣">
         <div class="instruction" style="color:#444; margin-top: 10px;">당신의 ID: <strong id="current-user-id"></strong></div>
     </div>
 
@@ -152,13 +160,14 @@
 
         let currentUserId = null;
         let localPops = 0;
-        const closedImage = '귀엽다.png';
-        const openImage = '귀엽다2.png';
+        // 이미지 경로를 실제 사용하는 경로로 변경하세요.
+        const closedImage = 'https://via.placeholder.com/300x200/00FF00/FFFFFF?text=귀엽다';
+        const openImage = 'https://via.placeholder.com/300x200/FF0000/FFFFFF?text=귀엽다2';
 
         // 폴링 및 활동 감지 관련 변수
         let rankingsInterval = null; // 랭킹 읽어오는 주기
         const FAST_POLLING_INTERVAL = 5000; // 5초
-        const SLOW_POPOLLING_INTERVAL = 30000; // 30초
+        const SLOW_POLLING_INTERVAL = 30000; // 30초
         const FAST_POLLING_DURATION_COUNT = 4; // 5초 주기로 4번 더 업데이트 (총 20초)
 
         let fastPollingActive = false; // 현재 빠른 폴링 모드인지 여부
@@ -176,7 +185,8 @@
                 gameScreen.style.display = 'block';
                 await loadMyPopsInitial();
                 // 게임 시작 시에는 느린 폴링 모드 유지, 첫 클릭을 기다림.
-                // startPolling(SLOW_POPOLLING_INTERVAL); // 이미 DOMContentLoaded에서 시작됨
+                // 이미 DOMContentLoaded에서 SLOW_POLLING_INTERVAL로 시작되었으므로 주석 처리
+                // startPolling(SLOW_POLLING_INTERVAL); 
             } else {
                 alert("ID를 입력해 주세요.");
             }
@@ -201,13 +211,18 @@
             if (rankingsInterval) {
                 clearInterval(rankingsInterval);
             }
-            rankingsInterval = setInterval(handlePollingTick, interval);
+            // 폴링 시작 시 즉시 랭킹 업데이트
+            updateRankings(); 
+            // 그리고 주기적으로 업데이트
+            rankingsInterval = setInterval(() => {
+                handlePollingTick(); // 카운터만 관리
+                updateRankings();    // 실제 랭킹 업데이트
+            }, interval);
             console.log(`Polling started with interval: ${interval / 1000}s`);
         }
 
-        // 폴링 틱 핸들러
-        async function handlePollingTick() {
-            // 빠른 폴링 모드이고, 남은 횟수가 있으면 카운트 감소
+        // 폴링 틱 핸들러 (이제 카운터만 관리)
+        function handlePollingTick() {
             if (fastPollingActive && fastPollingCounter > 0) {
                 fastPollingCounter--;
                 console.log(`Fast polling active. Remaining: ${fastPollingCounter}`);
@@ -215,11 +230,9 @@
                 // 빠른 폴링 횟수 종료, 느린 폴링으로 전환
                 console.log("Fast polling finished. Switching to slow polling.");
                 fastPollingActive = false;
-                startPolling(SLOW_POPOLLING_INTERVAL);
+                startPolling(SLOW_POLLING_INTERVAL);
             }
-
-            // 실제 순위 업데이트 실행
-            await updateRankings();
+            // 실제 순위 업데이트는 startPolling에서 주기적으로 호출되거나, 클릭 시 즉시 호출됨.
         }
 
         // ----------------------------------------------------
@@ -248,10 +261,14 @@
 
             // 첫 클릭이거나 빠른 폴링 모드가 아닐 때만 빠른 폴링 시작
             if (!fastPollingActive) {
-                console.log("First click detected! Starting fast polling.");
+                console.log("First click detected or fast polling not active! Starting fast polling.");
                 fastPollingActive = true;
                 fastPollingCounter = FAST_POLLING_DURATION_COUNT; // 4번 더 실행
                 startPolling(FAST_POLLING_INTERVAL); // 5초 주기로 즉시 전환
+            } else {
+                // 빠른 폴링 중 추가 클릭 시 카운트 초기화 (5초 유지 보장)
+                fastPollingCounter = FAST_POLLING_DURATION_COUNT;
+                console.log(`Fast polling reset. Remaining: ${fastPollingCounter}`);
             }
 
             // 클릭 발생 시 즉시 순위 갱신 (더 빠른 반영)
@@ -303,137 +320,4 @@
             requestAnimationFrame(() => {
                 element.querySelectorAll(".digit-container").forEach(c => {
                     const oldDigit = c.querySelector(".digit-number.old");
-                    const newDigit = c.querySelector(".digit-number.new");
-
-                    if (oldDigit) oldDigit.classList.add("exit");
-                    if (newDigit) {
-                        newDigit.classList.remove("new");
-                        newDigit.classList.add("enter");
-                    }
-                });
-            });
-
-            setTimeout(() => {
-                element.querySelectorAll(".digit-number.old.exit").forEach(e => e.remove());
-                element.querySelectorAll(".digit-number.enter").forEach(e => {
-                    e.classList.remove("enter");
-                    e.className = "digit-number";
-                    e.style.transform = "translateY(0)";
-                });
-            }, 400);
-        }
-
-        // ----------------------------------------------------
-        // 7. 순위표 업데이트
-        // ----------------------------------------------------
-        function updateRankList(ranks) {
-            if (ranks.length === 0) {
-                top10List.innerHTML = '<li>아직 데이터가 없습니다.</li>';
-                return;
-            }
-
-            const currentRankIds = new Set(ranks.map(r => `rank-${r.id}`));
-            Array.from(top10List.children).forEach(li => {
-                if (!currentRankIds.has(li.id)) li.remove();
-            });
-
-            ranks.forEach((r, i) => {
-                const listId = `rank-${r.id}`;
-                const popSpanId = `rank-pops-${r.id}`;
-                let li = document.getElementById(listId);
-                let popSpanToUpdate = null;
-
-                if (!li) {
-                    li = document.createElement('li');
-                    li.id = listId;
-
-                    const rankIdSpan = document.createElement('span');
-                    rankIdSpan.className = 'rank-id';
-
-                    const popWrapper = document.createElement('span');
-                    popWrapper.className = 'rank-pops';
-
-                    const popSpan = document.createElement('span');
-                    popSpan.id = popSpanId;
-                    popSpan.textContent = r.pops; // 초기값 설정
-
-                    popWrapper.appendChild(popSpan);
-                    li.appendChild(rankIdSpan);
-                    li.appendChild(popWrapper);
-
-                    const existing = Array.from(top10List.children);
-                    if (i < existing.length) {
-                        top10List.insertBefore(li, existing[i]);
-                    } else {
-                        top10List.appendChild(li);
-                    }
-                } else {
-                    popSpanToUpdate = document.getElementById(popSpanId);
-                }
-
-                li.querySelector('.rank-id').textContent = `${i + 1}. ${r.id}`;
-                if (popSpanToUpdate) {
-                    updateNumberSmooth(popSpanToUpdate, r.pops);
-                }
-            });
-        }
-
-        // ----------------------------------------------------
-        // 8. 순위 및 전체 클릭 수 업데이트 (애니메이션 포함)
-        // ----------------------------------------------------
-        async function updateRankings(initialLoad = false) { // initialLoad 플래그 추가
-            let totalPops = 0;
-            const ranks = [];
-
-            try {
-                const snapshot = await db.collection("users")
-                    .orderBy("pops", "desc")
-                    .limit(10)
-                    .get();
-
-                const totalSnapshot = await db.collection("users").get();
-                totalSnapshot.docs.forEach(doc => {
-                    totalPops += Number(doc.data().pops) || 0;
-                });
-
-                // 초기 로드 시 0부터 애니메이션, 그 외에는 현재 값부터 애니메이션
-                if (initialLoad) {
-                    // 처음 로드할 때는 current value가 '로딩 중...' 이므로, 0부터 시작하도록 강제
-                    totalPopsValue.textContent = '0';
-                    updateNumberSmooth(totalPopsValue, totalPops);
-                } else {
-                    updateNumberSmooth(totalPopsValue, totalPops);
-                }
-                
-                // 순위표는 항상 현재 값부터 애니메이션
-                snapshot.docs.forEach(doc => {
-                    ranks.push({ id: doc.id, pops: Number(doc.data().pops) || 0 });
-                });
-                updateRankList(ranks);
-
-            } catch (err) {
-                console.error("Firestore 오류:", err);
-                // 오류 발생 시에도 0부터 애니메이션 (또는 현재 값부터)
-                if (initialLoad) {
-                    totalPopsValue.textContent = '0';
-                    updateNumberSmooth(totalPopsValue, 0);
-                } else {
-                    updateNumberSmooth(totalPopsValue, 0);
-                }
-                if (top10List.children.length === 0) {
-                    top10List.innerHTML = '<li>로딩 오류</li>';
-                }
-            }
-        }
-
-        // ----------------------------------------------------
-        // 9. 초기 실행: 페이지 로드 시 바로 순위 업데이트 시작
-        // ----------------------------------------------------
-        document.addEventListener('DOMContentLoaded', async () => {
-            // ID 입력 화면에서 랭킹을 가져올 때 애니메이션 적용
-            await updateRankings(true); // initialLoad 플래그를 true로 설정
-            startPolling(SLOW_POPOLLING_INTERVAL); // 30초 주기로 폴링 시작
-        });
-    </script>
-</body>
-</html>
+                    const newDigit =
