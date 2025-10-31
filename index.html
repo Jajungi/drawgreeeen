@@ -46,55 +46,56 @@
             margin: 4px 0;
             display: flex;
             justify-content: space-between;
+            line-height: 1.2; /* 숫자 높이 기준 */
         }
         #top-10-list .rank-id {
             font-weight: bold;
         }
         
-        /* 🔥 애니메이션 관련 스타일 추가 🔥 */
-        .num-wrapper {
+        /* 🔥 애니메이션 관련 스타일 수정 및 추가 🔥 */
+        .digit-container {
             display: inline-block;
             position: relative;
-            height: 1.2em; /* 텍스트 높이에 맞춤 */
+            height: 1.2em; /* 텍스트 높이 기준 */
             overflow: hidden;
-            text-align: right;
-            min-width: 30px; /* 숫자 움직임 공간 확보 */
+            margin: 0;
+            padding: 0;
+            vertical-align: top;
+            line-height: 1.2;
         }
         
-        .rank-pops .num-wrapper {
-             /* 순위표 점수 영역 너비 조정 */
-             min-width: 80px; 
-             text-align: right;
-             color: #007bff;
+        .digit-wrap {
+            position: relative;
+            transform: translateY(0);
+            transition: transform 0.5s ease-out;
+            line-height: 1.2;
+            white-space: nowrap; /* 줄바꿈 방지 */
+        }
+        
+        .static-text { /* 콤마나 일반 텍스트 */
+            display: inline-block;
+            line-height: 1.2;
+            vertical-align: top;
         }
 
-        .num-slide {
-            position: absolute;
-            width: 100%;
-            top: 0;
-            left: 0;
-            transition: transform 0.5s ease, opacity 0.5s ease;
-        }
-        
-        .slide-up {
-            transform: translateY(-100%);
-            opacity: 0;
-        }
-        
-        .slide-in {
-            transform: translateY(0);
-            opacity: 1;
+        .rank-pops {
+            display: flex;
+            text-align: right;
+            color: #007bff;
+            justify-content: flex-end; /* 숫자를 오른쪽 정렬 */
+            min-width: 100px; 
         }
 
         /* 게임 화면 스타일 */
         #start-screen { display: flex; flex-direction: column; align-items: center; }
         #game-screen { display: none; text-align: center; }
-        #my-pops-display-wrapper { /* 개인 클릭 수 애니메이션 Wrapper */
+        #my-pops-display-wrapper { 
             font-size: 3.5em; 
             font-weight: bold;
             margin-bottom: 10px;
             color: #d9534f;
-            display: block; /* 블록 요소로 설정 */
+            display: block; 
+            line-height: 1.2;
         }
         
         #popcat-image {
@@ -122,9 +123,7 @@
     <div id="ranking-section">
         <h3>🏆 전체 클릭 수</h3>
         <div id="total-pops-display">
-            <span class="num-wrapper">
-                <span id="total-pops-value" class="num-slide slide-in">로딩 중...</span>
-            </span>
+            <div id="total-pops-value" style="display:inline-block;">로딩 중...</div>
         </div>
         <hr>
         <h4>TOP 10 순위표</h4>
@@ -141,9 +140,7 @@
     <div id="game-screen">
         <p style="font-size:1.2em; margin-bottom: 5px;">내 클릭 수</p>
         <div id="my-pops-display-wrapper">
-            <span class="num-wrapper">
-                <span id="my-pops-display" class="num-slide slide-in">0</span>
-            </span>
+            <span id="my-pops-display">0</span>
         </div>
         
         <img id="popcat-image" src="귀엽다.png" alt="팝캣">
@@ -196,7 +193,7 @@
                 startScreen.style.display = 'none';
                 gameScreen.style.display = 'block';
 
-                // 🔥 5초마다 업데이트 (폴링) 시작
+                // 🔥 5초마다 개인 점수 업데이트 시작
                 updateMyPops(); // 초기 호출
                 myPopsInterval = setInterval(updateMyPops, 5000); 
                 
@@ -207,12 +204,11 @@
         startButton.addEventListener('click', startGame);
 
         // ----------------------------------------------------
-        // 4. 클릭 처리 및 데이터베이스 업데이트 (Increment 사용)
+        // 4. 클릭 처리 및 데이터베이스 업데이트
         // ----------------------------------------------------
         async function handlePop() {
             if (!currentUserId) return;
 
-            // 이미지 변경 (프론트엔드 반응)
             catImage.src = openImage;
             setTimeout(() => { catImage.src = closedImage; }, 80);
 
@@ -224,9 +220,9 @@
                     pops: firebase.firestore.FieldValue.increment(1)
                 }, { merge: true });
                 
-                // 로컬 점수 즉시 반영 (느낌을 좋게 하기 위해)
+                // 로컬 점수 즉시 반영 (애니메이션 적용)
                 const currentPops = Number(myPopsDisplay.textContent.replace(/,/g, '')) || 0;
-                myPopsDisplay.textContent = (currentPops + 1).toLocaleString();
+                updateNumberSmooth(myPopsDisplay, currentPops + 1);
 
             } catch (error) {
                 console.error("클릭 카운트 업데이트 실패:", error);
@@ -241,49 +237,56 @@
         });
 
         // ----------------------------------------------------
-        // 5. 애니메이션 및 폴링 함수 구현
+        // 5. 🔥 자릿수 기반 숫자 애니메이션 함수 🔥
         // ----------------------------------------------------
-        
-        // 🎞️ 숫자 전환 애니메이션 (총합, 순위, 내 점수)
         function updateNumberSmooth(element, newValue) {
             const oldValue = element.textContent.replace(/,/g, "");
-            if (Number(oldValue) === Number(newValue)) return;
-
-            const parent = element.parentNode;
-            const newEl = document.createElement("span");
+            const newFormattedValue = newValue.toLocaleString();
+            const oldFormattedValue = Number(oldValue).toLocaleString();
             
-            newEl.className = "num-slide";
-            newEl.textContent = newValue.toLocaleString();
-            newEl.style.transform = "translateY(100%)";
-            newEl.style.opacity = "0";
+            if (oldValue === newValue.toString()) return;
 
-            // 기존 요소의 클래스를 복사하여 스타일 유지 (예: my-pops-display)
-            if (element.classList) {
-                element.classList.forEach(cls => {
-                    if (cls !== 'num-slide' && cls !== 'slide-up' && cls !== 'slide-in') {
-                        newEl.classList.add(cls);
-                    }
-                });
-            }
-            
-            parent.appendChild(newEl);
+            // 새로운 HTML을 생성하여 숫자를 자릿수별로 분리
+            let newHtml = '';
+            let digitIndex = 0;
 
-            requestAnimationFrame(() => {
-                element.classList.add("slide-up");
-                newEl.classList.add("slide-in");
-                newEl.style.transform = "translateY(0)";
-                newEl.style.opacity = "1";
-            });
+            // 긴 쪽을 기준으로 루프를 돌림 (자릿수 증가/감소 대응)
+            const maxLength = Math.max(oldFormattedValue.length, newFormattedValue.length);
 
-            setTimeout(() => {
-                if (parent.contains(element)) {
-                    parent.removeChild(element);
+            for (let i = 0; i < maxLength; i++) {
+                const oldChar = oldFormattedValue.charAt(oldFormattedValue.length - 1 - i) || '';
+                const newChar = newFormattedValue.charAt(newFormattedValue.length - 1 - i) || '';
+
+                if (oldChar === newChar || oldChar === ',' || newChar === ',') {
+                    // 숫자가 같거나 콤마인 경우: 고정된 텍스트
+                    newHtml = `<span class="static-text">${newChar || oldChar}</span>` + newHtml;
+                } else {
+                    // 숫자가 변경되는 경우: 애니메이션 적용
+                    newHtml = `
+                        <span class="digit-container">
+                            <span class="digit-wrap" data-old="${oldChar}" data-new="${newChar}">
+                                <span>${oldChar}</span>
+                                <span style="display: block;">${newChar}</span>
+                            </span>
+                        </span>
+                    ` + newHtml;
+                    digitIndex++;
                 }
-                newEl.id = element.id;
-            }, 500);
+            }
+
+            // HTML 교체
+            element.innerHTML = newHtml;
+
+            // 애니메이션 실행
+            setTimeout(() => {
+                element.querySelectorAll('.digit-wrap').forEach(wrap => {
+                    // wrap의 높이만큼 위로 이동
+                    wrap.style.transform = `translateY(-${wrap.offsetHeight / 2}px)`; 
+                });
+            }, 10);
         }
-        
-        // 🏆 순위표 리스트에 애니메이션 적용
+
+        // 🏆 순위표 리스트 업데이트 (자릿수 애니메이션 적용)
         function updateRankList(ranks) {
             top10List.innerHTML = ''; // 기존 목록 초기화
 
@@ -299,15 +302,21 @@
                 const popWrapper = document.createElement('span');
                 popWrapper.className = 'rank-pops';
                 
-                const popSlide = document.createElement('span');
-                popSlide.className = 'num-slide slide-in';
-                popSlide.textContent = r.pops.toLocaleString();
-                
-                popWrapper.appendChild(popSlide);
+                // 초기값 설정 및 애니메이션 적용 (이전에 updateNumberSmooth가 처리했으나, 5초 업데이트이므로 updateNumberSmooth로만 처리)
+                const popSpan = document.createElement('span');
+                popSpan.textContent = r.pops.toLocaleString(); // 초기값 표시
+                popSpan.id = `rank-pops-${r.id}`; // ID 부여
+                popWrapper.appendChild(popSpan);
                 
                 li.appendChild(rankIdSpan);
                 li.appendChild(popWrapper);
                 top10List.appendChild(li);
+
+                // 5초마다 호출될 때, 해당 ID의 점수를 애니메이션으로 업데이트
+                const existingEl = document.getElementById(`rank-pops-${r.id}`);
+                if(existingEl) {
+                    updateNumberSmooth(existingEl, r.pops);
+                }
             });
             
             if (ranks.length === 0) {
@@ -332,26 +341,24 @@
                 const totalSnapshot = await db.collection("users").get();
                 
                 totalSnapshot.docs.forEach(doc => {
-                    // Number()로 타입 보장
                     totalPops += Number(doc.data().pops || 0); 
                 });
 
                 // 3. 총합 애니메이션 적용
-                const currentTotalDisplay = document.getElementById('total-pops-value');
-                if (currentTotalDisplay) {
-                    updateNumberSmooth(currentTotalDisplay, totalPops);
-                }
+                updateNumberSmooth(totalPopsValue, totalPops);
                 
                 // 4. 순위 리스트 업데이트
-                snapshot.docs.forEach((doc, index) => {
-                    const pops = Number(doc.data().pops || 0);
-                    ranks.push({ id: doc.id, pops });
+                snapshot.docs.forEach((doc) => {
+                    ranks.push({ id: doc.id, pops: Number(doc.data().pops || 0) });
                 });
+                
+                // 🚨 5초마다 순위를 업데이트할 때는, DOM을 한 번에 업데이트하는 것이 아닌,
+                // 개별 순위의 숫자만 애니메이션으로 업데이트합니다.
+                // 편의상 전체 리스트를 다시 그린 후 숫자에 애니메이션을 적용합니다.
                 updateRankList(ranks);
                 
             } catch (err) {
                 console.error("Firestore 순위 업데이트 오류:", err);
-                // 인덱스 오류가 발생하면 이 에러가 출력됩니다!
                 if (top10List.children.length === 0) {
                      top10List.innerHTML = '<li>순위 로딩 오류 (인덱스 확인 필요)</li>';
                 }
@@ -365,18 +372,13 @@
             try {
                 const doc = await db.collection("users").doc(currentUserId).get();
                 
-                const currentMyPopsDisplay = document.getElementById('my-pops-display');
-
                 if (doc.exists) {
                     const myPops = Number(doc.data().pops || 0);
-                    if (currentMyPopsDisplay) {
-                        updateNumberSmooth(currentMyPopsDisplay, myPops);
-                    }
+                    // 🚨 내 점수에 애니메이션 적용
+                    updateNumberSmooth(myPopsDisplay, myPops);
                 } else {
                     // 새 사용자인 경우
-                    if (currentMyPopsDisplay) {
-                        updateNumberSmooth(currentMyPopsDisplay, 0);
-                    }
+                    updateNumberSmooth(myPopsDisplay, 0);
                 }
             } catch (err) {
                 console.error(`내 클릭 수 업데이트 에러:`, err);
