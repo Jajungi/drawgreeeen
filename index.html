@@ -155,7 +155,14 @@
         let localPops = 0;
         const closedImage = '귀엽다.png';
         const openImage = '귀엽다2.png';
-        let rankingsInterval = null;
+
+        // 폴링 및 활동 감지 관련 변수
+        let rankingsInterval = null; // 랭킹 읽어오는 주기
+        let activityCheckTimeout = null; // 20초 비활동 감지 타이머
+        const FAST_POLLING_INTERVAL = 5000; // 5초
+        const SLOW_POLLING_INTERVAL = 30000; // 30초
+        const INACTIVITY_THRESHOLD = 20000; // 20초 (활동 없음 감지 시간)
+        let currentPollingInterval = SLOW_POLLING_INTERVAL; // 초기 폴링 주기
 
         // ----------------------------------------------------
         // 3. 게임 시작
@@ -168,6 +175,7 @@
                 startScreen.style.display = 'none';
                 gameScreen.style.display = 'block';
                 await loadMyPopsInitial();
+                resetActivityTimer(); // 게임 시작 시 활동 타이머 리셋
             } else {
                 alert("ID를 입력해 주세요.");
             }
@@ -186,12 +194,33 @@
         }
 
         // ----------------------------------------------------
-        // 4. 폴링 시작 (항상 5초 고정)
+        // 4. 폴링 시작 (주기 변경 가능)
         // ----------------------------------------------------
-        function startPolling() {
-            clearInterval(rankingsInterval);
-            rankingsInterval = setInterval(updateRankings, 5000);
-            updateRankings(); // 즉시 실행
+        function startPolling(interval = currentPollingInterval) {
+            if (rankingsInterval) clearInterval(rankingsInterval); // 기존 타이머 중지
+            currentPollingInterval = interval; // 현재 폴링 주기 업데이트
+            rankingsInterval = setInterval(updateRankings, currentPollingInterval);
+            updateRankings(); // 타이머 시작 시 즉시 실행
+            console.log(`Polling started with interval: ${currentPollingInterval / 1000}s`);
+        }
+
+        // 비활동 타이머 리셋 함수
+        function resetActivityTimer() {
+            if (activityCheckTimeout) clearTimeout(activityCheckTimeout);
+
+            // 20초 후 비활동 상태로 전환 (30초 폴링)
+            activityCheckTimeout = setTimeout(() => {
+                if (currentPollingInterval !== SLOW_POLLING_INTERVAL) {
+                    console.log("20초간 활동 없음. Polling interval changing to 30s.");
+                    startPolling(SLOW_POLLING_INTERVAL);
+                }
+            }, INACTIVITY_THRESHOLD);
+
+            // 활동 감지 시 5초 폴링 상태가 아니라면 5초 폴링으로 전환
+            if (currentPollingInterval !== FAST_POLLING_INTERVAL) {
+                console.log("Activity detected. Polling interval changing to 5s.");
+                startPolling(FAST_POLLING_INTERVAL);
+            }
         }
 
         // ----------------------------------------------------
@@ -208,17 +237,21 @@
             localPops++;
             updateNumberSmooth(myPopsDisplay, localPops); // 애니메이션 함수 사용
 
-            // Firestore 증가
+            // Firestore 즉시 업데이트
             const userRef = db.collection("users").doc(currentUserId);
             try {
                 await userRef.set({
                     pops: firebase.firestore.FieldValue.increment(1)
                 }, { merge: true });
+                // console.log("Firestore updated immediately.");
             } catch (error) {
                 console.error("클릭 업데이트 실패:", error);
             }
 
-            // 즉시 순위 갱신 (선택적, 더 빠른 반영)
+            // 활동 감지 및 타이머 리셋 (5초 폴링으로 전환)
+            resetActivityTimer();
+
+            // 즉시 순위 갱신 (더 빠른 반영)
             updateRankings();
         }
 
@@ -348,7 +381,7 @@
         }
 
         // ----------------------------------------------------
-        // 8. 순위 및 전체 클릭 수 업데이트 (항상 5초)
+        // 8. 순위 및 전체 클릭 수 업데이트 (동적 주기)
         // ----------------------------------------------------
         async function updateRankings() {
             let totalPops = 0;
@@ -360,6 +393,7 @@
                     .limit(10)
                     .get();
 
+                // 총 클릭 수 집계 (효율성 개선 필요 - 이전 피드백 참조)
                 const totalSnapshot = await db.collection("users").get();
                 totalSnapshot.docs.forEach(doc => {
                     totalPops += Number(doc.data().pops) || 0;
@@ -386,7 +420,8 @@
         // 9. 초기 실행: 페이지 로드 시 바로 순위 업데이트 시작
         // ----------------------------------------------------
         document.addEventListener('DOMContentLoaded', () => {
-            startPolling(); // ID 입력 화면에서도 실시간 업데이트 시작
+            // 초기에는 30초 주기로 폴링 시작
+            startPolling(SLOW_POLLING_INTERVAL);
         });
     </script>
 </body>
