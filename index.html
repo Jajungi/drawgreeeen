@@ -30,6 +30,9 @@
             margin: 0;
             padding: 0;
             text-align: center;
+            /* 핵심: 고정 너비 → 숫자·콤마 모두 같은 폭 */
+            width: 0.6em;          /* Arial 기준 0.6em이면 딱 맞음 */
+            box-sizing: border-box;
         }
 
         .digit-number {
@@ -67,6 +70,7 @@
             line-height: 1.2;
             vertical-align: top;
             padding: 0 1px; /* 콤마의 공간 확보 */
+            min-width: 0.35em;
         }
         
         /* -------------------------------------------
@@ -273,74 +277,64 @@
         // 5. 🔥 자릿수 기반 애니메이션 함수 (최종 안정화 버전) 🔥
         // ----------------------------------------------------
         function updateNumberSmooth(element, newValue) {
-            // 1. 기존 값 파싱 및 NaN 방지
-            const oldValueText = element.textContent.replace(/,/g, "") || '0'; 
-            const oldNumberValue = Number(oldValueText) || 0;
+            // 1. 기존값 파싱
+            const oldText = element.textContent.replace(/,/g, "") || "0";
+            const oldVal   = Number(oldText) || 0;
+            if (oldVal === newValue) return;
 
-            if (oldNumberValue === newValue) return;
+            const oldStr = oldVal.toLocaleString();
+            const newStr = newValue.toLocaleString();
+            const maxLen = Math.max(oldStr.length, newStr.length);
 
-            const newFormattedValue = newValue.toLocaleString();
-            const oldFormattedValue = oldNumberValue.toLocaleString();
-    
-            let newHtml = '';
-    
-            // 2. 새로운 HTML 구조 생성 (자릿수 비교)
-            const maxLength = Math.max(oldFormattedValue.length, newFormattedValue.length);
-    
-            for (let i = 1; i <= maxLength; i++) {
-                const oldChar = oldFormattedValue.charAt(oldFormattedValue.length - i) || '';
-                const newChar = newFormattedValue.charAt(newFormattedValue.length - i) || '';
+            let html = "";
 
-                if (oldChar === newChar && oldChar !== '' && oldChar !== ',') {
-                    newHtml = `<span class="static-text">${newChar}</span>` + newHtml;
-                } else if (oldChar === ',' || newChar === ',') {
-                    newHtml = `<span class="static-text">,</span>` + newHtml;
+            for (let i = 1; i <= maxLen; i++) {
+                const oldChar = oldStr.charAt(oldStr.length - i) || "";
+                const newChar = newStr.charAt(newStr.length - i) || "";
+
+                if (oldChar === newChar && oldChar !== "" && oldChar !== ",") {
+                    html = `<span class="static-text">${newChar}</span>` + html;
+                } else if (oldChar === "," || newChar === ",") {
+                    html = `<span class="static-text">,</span>` + html;
                 } else {
-                    const displayOldChar = oldChar === '' ? '&nbsp;' : oldChar;
-                    const displayNewChar = newChar === '' ? '&nbsp;' : newChar;
-
-                    newHtml = `
+                    const oldDisp = oldChar === "" ? "&nbsp;" : oldChar;
+                    const newDisp = newChar === "" ? "&nbsp;" : newChar;
+                    html = `
                         <span class="digit-container">
-                            <span class="digit-number old">${displayOldChar}</span>
-                            <span class="digit-number new">${displayNewChar}</span>
-                        </span>
-                    ` + newHtml;
+                            <span class="digit-number old">${oldDisp}</span>
+                            <span class="digit-number new">${newDisp}</span>
+                        </span>` + html;
                 }
             }
 
-            // 3. HTML 교체
-            element.innerHTML = newHtml;
+            // 2. DOM 교체
+            element.innerHTML = html;
 
-            // === 핵심: 강제 리플로우 + 다음 프레임에 애니메이션 시작 ===
-            void element.offsetHeight; // ← 이 줄 추가! DOM 반영 강제
+            // 3. 강제 리플로우 → 브라우저가 새 레이아웃을 확실히 인식
+            void element.offsetHeight;
 
+            // 4. 다음 페인트 사이클에 애니메이션 시작
             requestAnimationFrame(() => {
-                requestAnimationFrame(() => { // ← 이중으로 보장
-                    element.querySelectorAll('.digit-container').forEach(container => {
-                        const oldNum = container.querySelector('.digit-number.old');
-                        const newNum = container.querySelector('.digit-number.new');
-                
-                        if (oldNum) oldNum.classList.add("exit");
-                        if (newNum) {
-                            newNum.classList.remove("new");
-                            newNum.classList.add("enter");
-                        }
-                    });
+                element.querySelectorAll(".digit-container").forEach(c => {
+                    const old = c.querySelector(".digit-number.old");
+                    const nw  = c.querySelector(".digit-number.new");
+                    if (old) old.classList.add("exit");
+                    if (nw) {
+                        nw.classList.remove("new");
+                        nw.classList.add("enter");
+                    }
                 });
             });
 
-            // 5. 애니메이션 완료 후 정리
+            // 5. 애니메이션 종료 후 정리 (0.4s와 일치)
             setTimeout(() => {
-                element.querySelectorAll('.digit-number.old').forEach(oldNum => {
-                    oldNum.remove();
-                });
-                element.querySelectorAll('.digit-number.enter').forEach(newNum => {
-                    newNum.classList.remove("enter");
-                    newNum.classList.add("old");
+                element.querySelectorAll(".digit-number.old").forEach(e => e.remove());
+                element.querySelectorAll(".digit-number.enter").forEach(e => {
+                    e.classList.remove("enter");
+                    e.classList.add("old");
                 });
             }, 400);
-        }        
-
+        }
 
         // 🏆 순위표 리스트 업데이트 (생략)
         function updateRankList(ranks) {
@@ -473,4 +467,5 @@
 
 </body>
 </html>
+
 
