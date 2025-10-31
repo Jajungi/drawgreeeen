@@ -210,7 +210,7 @@
             // ★ 클릭 시간 갱신 + 무조건 5초 폴링 재시작 ★
             lastClickTime = Date.now();
             if (currentPollingInterval !== 5000) {
-                startPolling(); // 강제 5초 재시작
+                currentPollingInterval = 5000; // 강제 5초 재시작
             }
 
             // 선택적: 클릭 즉시 순위 갱신 (더 빠른 반영 원하면 주석 해제)
@@ -386,3 +386,4 @@
     </script>
 </body>
 </html>
+
