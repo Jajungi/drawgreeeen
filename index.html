@@ -144,11 +144,8 @@
 
         // 폴링 관련
         let rankingsInterval = null;
-        let fastPollingActive = true;
-        let fastPollingCounter = 0;
-        const FAST_POLLING_INTERVAL = 5000;
-        const SLOW_POPOLLING_INTERVAL = 7000;
-        const FAST_POLLING_DURATION_COUNT = 4;
+        // 항상 8초 대기로 고정
+        const POLLING_INTERVAL = 8000; // 8초
 
         // ----------------- 게임 시작 -----------------
         startButton.addEventListener('click', startGame);
@@ -198,30 +195,20 @@
                 }, { merge: true });
             } catch (err) { console.error("클릭 업데이트 실패:", err); }
 
-            if (!fastPollingActive) {
-                startPolling(FAST_POLLING_INTERVAL, true, FAST_POLLING_DURATION_COUNT);
-            }
+            // 클릭 시 폴링 간격 변경 로직 제거. 항상 POLLING_INTERVAL 유지.
+            // 필요하다면, 클릭 후 즉시 랭킹 업데이트를 한 번 수행할 수 있습니다.
+            // updateRankings();
         }
 
         // ----------------- 폴링 제어 -----------------
-        function startPolling(interval, fastMode = false, fastCount = 0) {
+        function startPolling(interval) {
             if (rankingsInterval) clearInterval(rankingsInterval);
-
-            fastPollingActive = fastMode;
-            fastPollingCounter = fastCount;
 
             rankingsInterval = setInterval(async () => {
                 await updateRankings();
-
-                if (fastPollingActive) {
-                    fastPollingCounter--;
-                    if (fastPollingCounter <= 0) {
-                        startPolling(SLOW_POPOLLING_INTERVAL, false);
-                    }
-                }
             }, interval);
 
-            console.log(`Polling started: ${fastMode ? "FAST" : "SLOW"}, interval=${interval}ms`);
+            console.log(`Polling started: interval=${interval}ms`);
         }
 
         // ----------------- 숫자 애니메이션 -----------------
@@ -317,11 +304,8 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             await updateRankings(true);
-            startPolling(SLOW_POPOLLING_INTERVAL); // 느린 폴링 시작
+            startPolling(POLLING_INTERVAL); // 항상 8초 폴링 시작
         });
     </script>
 </body>
 </html>
-
-
-
