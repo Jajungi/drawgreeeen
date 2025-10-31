@@ -156,12 +156,14 @@
         const openImage = '귀엽다2.png';
 
         // 폴링 및 활동 감지 관련 변수
-        let rankingsInterval = null; // 랭킹 읽어오는 주기
-        let activityCheckTimeout = null; // 20초 비활동 감지 타이머
-        const FAST_POLLING_INTERVAL = 5000; // 5초
-        const SLOW_POLLING_INTERVAL = 30000; // 30초
-        const INACTIVITY_THRESHOLD = 20000; // 20초 (활동 없음 감지 시간)
-        let currentPollingInterval = SLOW_POLLING_INTERVAL; // 초기 폴링 주기
+        let rankingsInterval = null; // 랭킹 읽어오는 주기 setInterval ID
+        let fastPollingTimer = null; // 5초 폴링을 20초간 유지하기 위한 setTimeout ID
+
+        const FAST_POLLING_DURATION = 20000; // 5초 폴링을 20초간 유지 (5초 * 4번 업데이트)
+        const FAST_POLLING_INTERVAL = 5000; // 5초마다 랭킹 업데이트
+        const SLOW_POLLING_INTERVAL = 30000; // 30초마다 랭킹 업데이트
+
+        let isFastPollingActive = false; // 현재 5초 폴링이 활성화된 상태인지 여부
 
         // ----------------------------------------------------
         // 3. 게임 시작
@@ -174,9 +176,8 @@
                 startScreen.style.display = 'none';
                 gameScreen.style.display = 'block';
                 await loadMyPopsInitial();
-                // 게임 시작 시에는 5초 폴링으로 시작하고 활동 타이머 리셋
-                setPollingToFast();
-                resetInactivityTimer();
+                // 게임 시작 시에는 30초 폴링으로 시작 (첫 클릭을 기다림)
+                setPollingInterval(SLOW_POLLING_INTERVAL);
             } else {
                 alert("ID를 입력해 주세요.");
             }
@@ -194,43 +195,36 @@
         }
 
         // ----------------------------------------------------
-        // 4. 폴링 제어 함수
+        // 4. 폴링 주기 제어 함수
         // ----------------------------------------------------
 
         // 폴링 주기를 설정하고 타이머를 다시 시작
-        function startPolling(interval) {
+        function setPollingInterval(interval) {
             if (rankingsInterval) {
                 clearInterval(rankingsInterval);
             }
-            currentPollingInterval = interval;
-            rankingsInterval = setInterval(updateRankings, currentPollingInterval);
+            rankingsInterval = setInterval(updateRankings, interval);
             updateRankings(); // 타이머 시작 시 즉시 실행
-            console.log(`Polling started with interval: ${currentPollingInterval / 1000}s`);
+            console.log(`Polling interval set to: ${interval / 1000}s`);
         }
 
-        // 빠른 폴링 (5초)으로 전환
-        function setPollingToFast() {
-            if (currentPollingInterval !== FAST_POLLING_INTERVAL) {
-                startPolling(FAST_POLLING_INTERVAL);
+        // 5초 폴링 활성화 및 20초 타이머 시작/리셋
+        function activateFastPolling() {
+            if (!isFastPollingActive) { // 5초 폴링이 비활성화 상태일 때만 전환
+                isFastPollingActive = true;
+                setPollingInterval(FAST_POLLING_INTERVAL);
             }
-        }
 
-        // 느린 폴링 (30초)으로 전환
-        function setPollingToSlow() {
-            if (currentPollingInterval !== SLOW_POLLING_INTERVAL) {
-                startPolling(SLOW_POLLING_INTERVAL);
+            // 기존 20초 타이머가 있다면 클리어
+            if (fastPollingTimer) {
+                clearTimeout(fastPollingTimer);
             }
-        }
-
-        // 비활동 감지 타이머 리셋
-        function resetInactivityTimer() {
-            if (activityCheckTimeout) {
-                clearTimeout(activityCheckTimeout);
-            }
-            activityCheckTimeout = setTimeout(() => {
-                console.log("20초간 활동 없음. Polling interval changing to 30s.");
-                setPollingToSlow(); // 20초 후 느린 폴링으로 전환
-            }, INACTIVITY_THRESHOLD);
+            // 20초 후 30초 폴링으로 복귀하는 타이머 설정
+            fastPollingTimer = setTimeout(() => {
+                console.log("20초 동안 5초 폴링 유지 완료. 30초 폴링으로 복귀합니다.");
+                isFastPollingActive = false;
+                setPollingInterval(SLOW_POLLING_INTERVAL);
+            }, FAST_POLLING_DURATION);
         }
 
         // ----------------------------------------------------
@@ -257,10 +251,17 @@
                 console.error("클릭 업데이트 실패:", error);
             }
 
-            // 클릭 발생 시 5초 폴링으로 전환하고 비활동 타이머 리셋
-            setPollingToFast();
-            resetInactivityTimer();
-
+            // 첫 클릭이거나 30초 폴링 상태일 때 5초 폴링 활성화
+            // 5초 폴링 중에는 추가 클릭이 주기를 리셋하지 않음 (요구사항)
+            if (!isFastPollingActive) {
+                activateFastPolling();
+            } else {
+                // 5초 폴링 활성화 상태에서는 20초 타이머만 리셋 (즉, 5초 폴링 유지 기간 연장)
+                // 하지만 요구사항에 "다음 클릭은 무시하고 (클릭 수는 계속 올라가야 함) 5초동안 4번, 즉 20초동안 5초 주기로 업데이크 되고, 다시 30초로 바뀌면서 그 이후 첫 클릭을 기다리는거야" 라고 하셨으므로,
+                // 여기서는 20초 타이머도 리셋하지 않고 그대로 두는 것이 요구사항에 맞습니다.
+                // 즉, 20초 동안 추가 클릭이 발생하더라도 20초 타이머는 그대로 진행되어 20초가 지나면 30초로 전환됩니다.
+            }
+            
             // 즉시 순위 갱신 (더 빠른 반영)
             //updateRankings();
         }
@@ -274,7 +275,7 @@
         });
 
         // ----------------------------------------------------
-        // 6. 숫자 애니메이션 (쉼표 없음) - 이 함수는 전체 클릭 수와 랭킹에만 사용
+        // 6. 숫자 애니메이션 (쉼표 없음)
         // ----------------------------------------------------
         function updateNumberSmooth(element, newValue) {
             const oldText = element.textContent.replace(/[^0-9]/g, '') || "0";
@@ -422,10 +423,9 @@
         // 9. 초기 실행: 페이지 로드 시 바로 순위 업데이트 시작
         // ----------------------------------------------------
         document.addEventListener('DOMContentLoaded', () => {
-            // 초기에는 30초 주기로 폴링 시작
-            startPolling(SLOW_POLLING_INTERVAL);
+            // 초기에는 30초 주기로 폴링 시작 (첫 클릭을 기다림)
+            setPollingInterval(SLOW_POLLING_INTERVAL);
         });
     </script>
 </body>
 </html>
-
