@@ -22,13 +22,14 @@
             overflow: hidden;
             height: 1.2em;
             display: inline-block;
-            vertical-align: top;
+            vertical-align: top; /* 기준선 맞추기 */
             line-height: 1.2;
             margin: 0;
             padding: 0;
             text-align: center;
-            width: 0.6em;
+            width: 0.6em; /* 각 숫자의 너비 고정 */
             box-sizing: border-box;
+            white-space: nowrap; /* 중요: 내부 공백 문제 방지 */
         }
 
         .digit-number {
@@ -40,6 +41,7 @@
             align-items: center;
             transition: transform 0.4s ease-in-out;
             line-height: 1.2;
+            white-space: nowrap; /* 중요: 숫자 자체의 공백 문제 방지 */
         }
 
         .digit-number.new { transform: translateY(100%); }
@@ -66,8 +68,20 @@
 
         #start-screen { display: flex; flex-direction: column; align-items: center; }
         #game-screen { display: none; text-align: center; }
-        #my-pops-display-wrapper { font-size: 3.5em; font-weight: bold; margin-bottom: 10px; color: #d9534f; display: block; line-height: 1.2; }
-        #my-pops-display { line-height: 1.2; display: inline-block; }
+        #my-pops-display-wrapper {
+            font-size: 3.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #d9534f;
+            display: flex; /* Flexbox로 변경하여 내부 자간을 정확히 제어 */
+            justify-content: center;
+            align-items: center;
+            line-height: 1.2;
+        }
+        #my-pops-display {
+            line-height: 1.2;
+            /* display: inline-block; 제거 또는 변경. 래퍼가 flex이므로 필요 없음. */
+        }
 
         #popcat-image { width: 300px; height: auto; cursor: pointer; transition: transform 0.05s ease; }
         #popcat-image:active { transform: scale(0.98); }
@@ -164,7 +178,8 @@
             try {
                 const doc = await db.collection("users").doc(currentUserId).get();
                 localPops = doc.exists ? Number(doc.data().pops) || 0 : 0;
-                myPopsDisplay.textContent = localPops;
+                // 초기 로드 시 smooth 애니메이션 적용
+                updateNumberSmooth(myPopsDisplay, localPops);
             } catch (err) {
                 console.error(`내 클릭 수 로드 에러:`, err);
             }
@@ -191,7 +206,7 @@
 
             // 로컬 카운트 증가
             localPops++;
-            myPopsDisplay.textContent = localPops;
+            updateNumberSmooth(myPopsDisplay, localPops); // 애니메이션 함수 사용
 
             // Firestore 증가
             const userRef = db.collection("users").doc(currentUserId);
@@ -216,10 +231,11 @@
         });
 
         // ----------------------------------------------------
-        // 6. 숫자 애니메이션 (쉼표 없음)
+        // 6. 숫자 애니메이션 (쉼표 없음) - 수정됨
         // ----------------------------------------------------
         function updateNumberSmooth(element, newValue) {
-            const oldText = element.textContent || "0";
+            // 이전 텍스트에서 숫자만 추출합니다.
+            const oldText = element.textContent.replace(/[^0-9]/g, '') || "0";
             const oldVal = Number(oldText);
             if (oldVal === newValue) return;
 
@@ -228,45 +244,52 @@
             const maxLen = Math.max(oldStr.length, newStr.length);
             let html = "";
 
+            // 숫자의 오른쪽 정렬을 위해 앞에서부터 비교 (가장 오른쪽 자릿수부터)
             for (let i = 0; i < maxLen; i++) {
-                const oldChar = oldStr[oldStr.length - 1 - i] || "";
-                const newChar = newStr[newStr.length - 1 - i] || "";
-                if (oldChar === newChar && oldChar !== "") {
-                    html = `<span style="display:inline-block; width:0.6em; text-align:center;">${newChar}</span>` + html;
-                } else {
-                    const oldDisp = oldChar === "" ? "" : oldChar;
-                    const newDisp = newChar === "" ? "" : newChar;
+                const oldChar = oldStr[oldStr.length - 1 - i] || " "; // 빈 문자열 대신 공백으로 채워 너비 유지
+                const newChar = newStr[newStr.length - 1 - i] || " "; // 빈 문자열 대신 공백으로 채워 너비 유지
+
+                if (oldChar === newChar) {
+                    // 자릿수가 변하지 않고 같은 경우
                     html = `
                         <span class="digit-container">
-                            <span class="digit-number old">${oldDisp}</span>
-                            <span class="digit-number new">${newDisp}</span>
+                            <span class="digit-number">${newChar}</span>
+                        </span>` + html;
+                } else {
+                    // 자릿수가 변하거나 다른 경우 애니메이션 적용
+                    html = `
+                        <span class="digit-container">
+                            <span class="digit-number old">${oldChar}</span>
+                            <span class="digit-number new">${newChar}</span>
                         </span>` + html;
                 }
             }
 
             element.innerHTML = html;
-            void element.offsetHeight;
+            void element.offsetHeight; // Reflow 트리거 (애니메이션 준비)
 
             requestAnimationFrame(() => {
                 element.querySelectorAll(".digit-container").forEach(c => {
-                    const old = c.querySelector(".digit-number.old");
-                    const nw = c.querySelector(".digit-number.new");
-                    if (old) old.classList.add("exit");
-                    if (nw) {
-                        nw.classList.remove("new");
-                        nw.classList.add("enter");
+                    const oldDigit = c.querySelector(".digit-number.old");
+                    const newDigit = c.querySelector(".digit-number.new");
+
+                    if (oldDigit) oldDigit.classList.add("exit");
+                    if (newDigit) {
+                        newDigit.classList.remove("new");
+                        newDigit.classList.add("enter");
                     }
                 });
             });
 
+            // 애니메이션 종료 후 DOM 정리 (setTimeout 대신 transitionend 이벤트를 활용하는 것이 더 견고합니다.)
             setTimeout(() => {
-                element.querySelectorAll(".digit-number.old").forEach(e => e.remove());
+                element.querySelectorAll(".digit-number.old.exit").forEach(e => e.remove());
                 element.querySelectorAll(".digit-number.enter").forEach(e => {
                     e.classList.remove("enter");
-                    e.className = "digit-number";
-                    e.style.transform = "translateY(0)";
+                    e.className = "digit-number"; // 클래스 정리
+                    e.style.transform = "translateY(0)"; // 스타일 초기화
                 });
-            }, 400);
+            }, 400); // CSS transition 시간 (0.4s)과 일치
         }
 
         // ----------------------------------------------------
@@ -301,7 +324,7 @@
 
                     const popSpan = document.createElement('span');
                     popSpan.id = popSpanId;
-                    popSpan.textContent = r.pops;
+                    popSpan.textContent = r.pops; // 초기값 설정
 
                     popWrapper.appendChild(popSpan);
                     li.appendChild(rankIdSpan);
@@ -342,7 +365,8 @@
                     totalPops += Number(doc.data().pops) || 0;
                 });
 
-                updateNumberSmooth(totalPopsValue, totalPops);
+                // totalPopsValue에 smooth 애니메이션 적용
+                updateNumberSmooth(totalPopsValue.querySelector('#total-pops-value') || totalPopsValue, totalPops);
                 snapshot.docs.forEach(doc => {
                     ranks.push({ id: doc.id, pops: Number(doc.data().pops) || 0 });
                 });
@@ -350,7 +374,8 @@
 
             } catch (err) {
                 console.error("Firestore 오류:", err);
-                updateNumberSmooth(totalPopsValue, 0);
+                // 오류 발생 시에도 smooth 애니메이션 적용 (0으로)
+                updateNumberSmooth(totalPopsValue.querySelector('#total-pops-value') || totalPopsValue, 0);
                 if (top10List.children.length === 0) {
                     top10List.innerHTML = '<li>로딩 오류</li>';
                 }
