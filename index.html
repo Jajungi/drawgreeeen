@@ -142,8 +142,6 @@
         const closedImage = '귀엽다.png';
         const openImage = '귀엽다2.png';
         let rankingsInterval = null;
-        let lastClickTime = Date.now();
-        let currentPollingInterval = 5000;
 
         // ----------------------------------------------------
         // 3. 게임 시작
@@ -156,7 +154,6 @@
                 startScreen.style.display = 'none';
                 gameScreen.style.display = 'block';
                 await loadMyPopsInitial();
-                startPolling(); // 폴링 시작
             } else {
                 alert("ID를 입력해 주세요.");
             }
@@ -174,17 +171,16 @@
         }
 
         // ----------------------------------------------------
-        // 4. 폴링 시작 함수 (재사용 가능)
+        // 4. 폴링 시작 (항상 5초 고정)
         // ----------------------------------------------------
         function startPolling() {
             clearInterval(rankingsInterval);
-            currentPollingInterval = 5000;
             rankingsInterval = setInterval(updateRankings, 5000);
-            updateRankings(); // 즉시 한 번 실행
+            updateRankings(); // 즉시 실행
         }
 
         // ----------------------------------------------------
-        // 5. 클릭 처리 → 무조건 5초 복귀
+        // 5. 클릭 처리
         // ----------------------------------------------------
         async function handlePop() {
             if (!currentUserId) return;
@@ -207,14 +203,8 @@
                 console.error("클릭 업데이트 실패:", error);
             }
 
-            // ★ 클릭 시간 갱신 + 무조건 5초 폴링 재시작 ★
-            lastClickTime = Date.now();
-            if (currentPollingInterval !== 5000) {
-                currentPollingInterval = 5000; // 강제 5초 재시작
-            }
-
-            // 선택적: 클릭 즉시 순위 갱신 (더 빠른 반영 원하면 주석 해제)
-            // updateRankings();
+            // 즉시 순위 갱신 (선택적, 더 빠른 반영)
+            updateRankings();
         }
 
         catImage.addEventListener('mousedown', handlePop);
@@ -335,7 +325,7 @@
         }
 
         // ----------------------------------------------------
-        // 8. 순위 및 전체 클릭 수 업데이트
+        // 8. 순위 및 전체 클릭 수 업데이트 (항상 5초)
         // ----------------------------------------------------
         async function updateRankings() {
             let totalPops = 0;
@@ -358,13 +348,6 @@
                 });
                 updateRankList(ranks);
 
-                // ★ 20초 동안 클릭 없으면 60초로 느려짐 ★
-                if (Date.now() - lastClickTime > 20000 && currentPollingInterval !== 60000) {
-                    clearInterval(rankingsInterval);
-                    currentPollingInterval = 60000;
-                    rankingsInterval = setInterval(updateRankings, 60000);
-                }
-
             } catch (err) {
                 console.error("Firestore 오류:", err);
                 updateNumberSmooth(totalPopsValue, 0);
@@ -375,15 +358,11 @@
         }
 
         // ----------------------------------------------------
-        // 9. 초기 실행
+        // 9. 초기 실행: 페이지 로드 시 바로 순위 업데이트 시작
         // ----------------------------------------------------
         document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => {
-                totalPopsValue.textContent = "0";
-                updateNumberSmooth(totalPopsValue, 0);
-            }, 50);
+            startPolling(); // ID 입력 화면에서도 실시간 업데이트 시작
         });
     </script>
 </body>
 </html>
-
