@@ -17,6 +17,7 @@
             position: relative;
         }
 
+        /* 숫자 애니메이션 관련 CSS는 그대로 유지 (전체 클릭 수 및 랭킹에 적용) */
         .digit-container {
             position: relative;
             overflow: hidden;
@@ -73,14 +74,15 @@
             font-weight: bold;
             margin-bottom: 10px;
             color: #d9534f;
-            display: flex; /* Flexbox로 변경하여 내부 자간을 정확히 제어 */
+            /* Flexbox는 내 클릭 수에 애니메이션이 없으므로 필요 없을 수 있으나, 정렬 위해 유지 */
+            display: flex;
             justify-content: center;
             align-items: center;
             line-height: 1.2;
         }
         #my-pops-display {
             line-height: 1.2;
-            /* display: inline-block; 제거 또는 변경. 래퍼가 flex이므로 필요 없음. */
+            /* 내 클릭 수는 애니메이션이 없으므로, digit-container 관련 스타일을 직접 적용하지 않음 */
         }
 
         #popcat-image { width: 300px; height: auto; cursor: pointer; transition: transform 0.05s ease; }
@@ -143,7 +145,7 @@
         // ----------------------------------------------------
         const catImage = document.getElementById('popcat-image');
         const myPopsDisplay = document.getElementById('my-pops-display');
-        const totalPopsValue = document.getElementById('total-pops-value');
+        const totalPopsValue = document.getElementById('total-pops-value'); // 이 요소에 애니메이션 적용
         const top10List = document.getElementById('top-10-list');
         const startScreen = document.getElementById('start-screen');
         const gameScreen = document.getElementById('game-screen');
@@ -186,8 +188,8 @@
             try {
                 const doc = await db.collection("users").doc(currentUserId).get();
                 localPops = doc.exists ? Number(doc.data().pops) || 0 : 0;
-                // 초기 로드 시 smooth 애니메이션 적용
-                updateNumberSmooth(myPopsDisplay, localPops);
+                // 내 클릭 수는 애니메이션 없음, 직접 textContent 업데이트
+                myPopsDisplay.textContent = localPops;
             } catch (err) {
                 console.error(`내 클릭 수 로드 에러:`, err);
             }
@@ -233,9 +235,9 @@
             catImage.src = openImage;
             setTimeout(() => { catImage.src = closedImage; }, 80);
 
-            // 로컬 카운트 증가
+            // 로컬 카운트 증가 (내 클릭 수는 애니메이션 없음)
             localPops++;
-            updateNumberSmooth(myPopsDisplay, localPops); // 애니메이션 함수 사용
+            myPopsDisplay.textContent = localPops; // 직접 textContent 업데이트
 
             // Firestore 즉시 업데이트
             const userRef = db.collection("users").doc(currentUserId);
@@ -252,7 +254,7 @@
             resetActivityTimer();
 
             // 즉시 순위 갱신 (더 빠른 반영)
-            updateRankings();
+            //updateRankings();
         }
 
         catImage.addEventListener('mousedown', handlePop);
@@ -264,10 +266,9 @@
         });
 
         // ----------------------------------------------------
-        // 6. 숫자 애니메이션 (쉼표 없음) - 수정됨
+        // 6. 숫자 애니메이션 (쉼표 없음) - 이 함수는 전체 클릭 수와 랭킹에만 사용
         // ----------------------------------------------------
         function updateNumberSmooth(element, newValue) {
-            // 이전 텍스트에서 숫자만 추출합니다.
             const oldText = element.textContent.replace(/[^0-9]/g, '') || "0";
             const oldVal = Number(oldText);
             if (oldVal === newValue) return;
@@ -277,19 +278,16 @@
             const maxLen = Math.max(oldStr.length, newStr.length);
             let html = "";
 
-            // 숫자의 오른쪽 정렬을 위해 앞에서부터 비교 (가장 오른쪽 자릿수부터)
             for (let i = 0; i < maxLen; i++) {
-                const oldChar = oldStr[oldStr.length - 1 - i] || " "; // 빈 문자열 대신 공백으로 채워 너비 유지
-                const newChar = newStr[newStr.length - 1 - i] || " "; // 빈 문자열 대신 공백으로 채워 너비 유지
+                const oldChar = oldStr[oldStr.length - 1 - i] || " ";
+                const newChar = newStr[newStr.length - 1 - i] || " ";
 
                 if (oldChar === newChar) {
-                    // 자릿수가 변하지 않고 같은 경우
                     html = `
                         <span class="digit-container">
                             <span class="digit-number">${newChar}</span>
                         </span>` + html;
                 } else {
-                    // 자릿수가 변하거나 다른 경우 애니메이션 적용
                     html = `
                         <span class="digit-container">
                             <span class="digit-number old">${oldChar}</span>
@@ -299,7 +297,7 @@
             }
 
             element.innerHTML = html;
-            void element.offsetHeight; // Reflow 트리거 (애니메이션 준비)
+            void element.offsetHeight; // Reflow 트리거
 
             requestAnimationFrame(() => {
                 element.querySelectorAll(".digit-container").forEach(c => {
@@ -314,15 +312,14 @@
                 });
             });
 
-            // 애니메이션 종료 후 DOM 정리 (setTimeout 대신 transitionend 이벤트를 활용하는 것이 더 견고합니다.)
             setTimeout(() => {
                 element.querySelectorAll(".digit-number.old.exit").forEach(e => e.remove());
                 element.querySelectorAll(".digit-number.enter").forEach(e => {
                     e.classList.remove("enter");
-                    e.className = "digit-number"; // 클래스 정리
-                    e.style.transform = "translateY(0)"; // 스타일 초기화
+                    e.className = "digit-number";
+                    e.style.transform = "translateY(0)";
                 });
-            }, 400); // CSS transition 시간 (0.4s)과 일치
+            }, 400);
         }
 
         // ----------------------------------------------------
@@ -375,6 +372,7 @@
 
                 li.querySelector('.rank-id').textContent = `${i + 1}. ${r.id}`;
                 if (popSpanToUpdate) {
+                    // 순위표는 애니메이션 적용
                     updateNumberSmooth(popSpanToUpdate, r.pops);
                 }
             });
@@ -400,7 +398,16 @@
                 });
 
                 // totalPopsValue에 smooth 애니메이션 적용
-                updateNumberSmooth(totalPopsValue.querySelector('#total-pops-value') || totalPopsValue, totalPops);
+                updateNumberSmooth(totalPopsValue, totalPops); // <div id="total-pops-display">에 애니메이션 적용
+                // 주의: totalPopsValue는 <div>이므로, 이 안에 있는 텍스트 노드에 직접 애니메이션을 적용하려면
+                // <div id="total-pops-value" style="display:inline-block;">로딩 중...</div> 에 직접 숫자를 넣는 것이 아니라
+                // <div id="total-pops-display"><span id="total-pops-value">로딩 중...</span></div> 와 같이 하고
+                // updateNumberSmooth(totalPopsValue, totalPops)를 호출해야 합니다. 현재 구조상으로는 totalPopsValue가 div 그 자체입니다.
+                // 만약 <div id="total-pops-value"> 로딩 중... </div> 이라면,
+                // updateNumberSmooth(totalPopsValue, totalPops)는 div의 innerHTML을 변경합니다.
+                // 만약 <div id="total-pops-display"><div id="total-pops-value">로딩 중...</div></div> 라면
+                // updateNumberSmooth(totalPopsValue, totalPops)가 맞습니다. (기존 HTML 구조 확인)
+
                 snapshot.docs.forEach(doc => {
                     ranks.push({ id: doc.id, pops: Number(doc.data().pops) || 0 });
                 });
@@ -409,7 +416,7 @@
             } catch (err) {
                 console.error("Firestore 오류:", err);
                 // 오류 발생 시에도 smooth 애니메이션 적용 (0으로)
-                updateNumberSmooth(totalPopsValue.querySelector('#total-pops-value') || totalPopsValue, 0);
+                updateNumberSmooth(totalPopsValue, 0); // 대상 요소에 애니메이션 적용
                 if (top10List.children.length === 0) {
                     top10List.innerHTML = '<li>로딩 오류</li>';
                 }
