@@ -258,7 +258,7 @@
         });
 
         // ----------------------------------------------------
-        // 5. 🔥 자릿수 기반 숫자 애니메이션 함수 (NaN 수정) 🔥
+        // 5. 🔥 자릿수 기반 숫자 애니메이션 함수 🔥
         // ----------------------------------------------------
         function updateNumberSmooth(element, newValue) {
             // 🚨 NaN 수정: 콤마를 제거하여 Number() 변환 오류 방지 
@@ -312,65 +312,77 @@
             }, 10);
         }
 
-        // 🏆 순위표 리스트 업데이트 (자릿수 애니메이션 적용)
+        // 🏆 순위표 리스트 업데이트 (안정성 강화)
         function updateRankList(ranks) {
             
-            if (top10List.children.length === 0 && ranks.length === 0) {
-                 top10List.innerHTML = '<li>아직 데이터가 없습니다.</li>';
-                 return;
+            if (ranks.length === 0) {
+                top10List.innerHTML = '<li>아직 데이터가 없습니다.</li>';
+                return;
             }
-
-            // 임시 DOM으로 리스트 생성 (순위 변경에 유연하게 대응)
-            const newUl = document.createElement('ul');
-            newUl.style.display = 'none';
-            document.body.appendChild(newUl);
-
-            ranks.forEach((r, i) => {
-                const li = document.createElement('li');
-                li.id = `rank-${r.id}`;
-                li.style.lineHeight = '1.2';
-
-                // 순위 및 ID
-                const rankIdSpan = document.createElement('span');
-                rankIdSpan.className = 'rank-id';
-                rankIdSpan.textContent = `${i + 1}. ${r.id}`;
-                
-                // 점수 Wrapper
-                const popWrapper = document.createElement('span');
-                popWrapper.className = 'rank-pops';
-                
-                // 점수 애니메이션 대상 (초기값 설정)
-                const popSpan = document.createElement('span');
-                popSpan.id = `rank-pops-${r.id}`;
-                popSpan.textContent = r.pops.toLocaleString(); // 초기값 표시
-                popWrapper.appendChild(popSpan);
-                
-                li.appendChild(rankIdSpan);
-                li.appendChild(popWrapper);
-                newUl.appendChild(li);
-
-                // 기존 항목을 찾아 애니메이션 적용
-                const existingLi = document.getElementById(`rank-${r.id}`);
-                if (existingLi) {
-                    // 순위/ID만 즉시 갱신
-                    existingLi.querySelector('.rank-id').textContent = `${i + 1}. ${r.id}`;
-                    
-                    // 점수 애니메이션 적용
-                    const popSpanToUpdate = existingLi.querySelector(`#rank-pops-${r.id}`);
-                    if(popSpanToUpdate) {
-                        updateNumberSmooth(popSpanToUpdate, r.pops);
-                    }
-                } else {
-                    // 새로운 항목이면 추가 (성능 최적화를 위해 새로운 항목은 한 번에 추가해야 하지만,
-                    // 애니메이션 구조 복잡성 때문에 단순화하여 기존 항목이 없을 때만 삽입 로직 실행)
-                    top10List.appendChild(li);
+            
+            // 1. 현재 순위에 있는 ID 목록 (제거할 항목 체크용)
+            const currentRankIds = new Set(ranks.map(r => `rank-${r.id}`));
+            
+            // 2. DOM에서 제거해야 할 항목 제거 (TOP 10 밖으로 밀려난 항목)
+            Array.from(top10List.children).forEach(li => {
+                if (!currentRankIds.has(li.id)) {
+                    li.remove();
                 }
             });
-            
-            // 🔥 (최적화): 간단한 구현을 위해 순위표의 항목이 늘어나거나 줄어드는 경우를 처리하지 않고,
-            // 10개만 업데이트하는 방식으로 유지했습니다.
 
-            document.body.removeChild(newUl);
+            // 3. 순위를 돌며 업데이트 또는 추가 및 순서 조정
+            ranks.forEach((r, i) => {
+                const listId = `rank-${r.id}`;
+                let li = document.getElementById(listId);
+                const popSpanId = `rank-pops-${r.id}`;
+
+                if (!li) {
+                    // **🔥 새 항목 생성 및 DOM에 삽입 🔥**
+                    li = document.createElement('li');
+                    li.id = listId;
+                    li.style.lineHeight = '1.2';
+                    
+                    const rankIdSpan = document.createElement('span');
+                    rankIdSpan.className = 'rank-id';
+                    
+                    const popWrapper = document.createElement('span');
+                    popWrapper.className = 'rank-pops';
+                    
+                    const popSpan = document.createElement('span');
+                    popSpan.id = popSpanId;
+                    popSpan.textContent = r.pops.toLocaleString();
+                    
+                    popWrapper.appendChild(popSpan);
+                    li.appendChild(rankIdSpan);
+                    li.appendChild(popWrapper);
+                    
+                    // 올바른 위치에 삽입 (순서 재정렬)
+                    const existingChildren = Array.from(top10List.children);
+                    if (i < existingChildren.length) {
+                        top10List.insertBefore(li, existingChildren[i]);
+                    } else {
+                        top10List.appendChild(li);
+                    }
+                } else if (li.nextSibling && li.nextSibling.id !== `rank-${ranks[i+1]?.id}`) {
+                    // 순서가 바뀌었으면 재정렬 (항목이 있는데 위치가 다를 경우)
+                    const targetSibling = top10List.children[i];
+                    if (li !== targetSibling) {
+                        top10List.insertBefore(li, targetSibling);
+                    }
+                }
+
+                // 4. 업데이트 및 애니메이션 실행
+                const rankIdSpan = li.querySelector('.rank-id');
+                const popSpanToUpdate = li.querySelector(`#${popSpanId}`);
+                
+                // 순위/ID 갱신
+                rankIdSpan.textContent = `${i + 1}. ${r.id}`;
+
+                // 점수 애니메이션 적용
+                if(popSpanToUpdate) {
+                    updateNumberSmooth(popSpanToUpdate, r.pops);
+                }
+            });
         }
 
 
@@ -380,13 +392,13 @@
             const ranks = [];
             
             try {
-                // 1. TOP 10 데이터 가져오기 (orderBy + limit)
+                // 1. TOP 10 데이터 가져오기 
                 const snapshot = await db.collection("users")
                     .orderBy("pops", "desc")
                     .limit(10)
                     .get();
 
-                // 2. 전체 합계 계산을 위한 전체 데이터 가져오기 (쿼리 분리)
+                // 2. 전체 합계 계산을 위한 전체 데이터 가져오기 
                 const totalSnapshot = await db.collection("users").get();
                 
                 totalSnapshot.docs.forEach(doc => {
@@ -406,8 +418,9 @@
                 
             } catch (err) {
                 console.error("Firestore 순위 업데이트 오류:", err);
+                // 오류 발생 시 초기 로딩 메시지 유지
                 if (top10List.children.length === 0) {
-                     top10List.innerHTML = '<li>순위 로딩 오류 (인덱스 확인 필요)</li>';
+                     top10List.innerHTML = '<li>순위 로딩 오류 (콘솔 확인)</li>';
                 }
             }
         }
@@ -415,7 +428,6 @@
         // ----------------------------------------------------
         // 6. 시작 로직
         // ----------------------------------------------------
-        // 게임 시작 전에도 순위는 보여줍니다. (초기 로딩)
         updateRankings(); 
         
         // 🔥 5초마다 순위 업데이트 시작
