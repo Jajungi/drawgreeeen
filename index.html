@@ -46,17 +46,17 @@
             margin: 4px 0;
             display: flex;
             justify-content: space-between;
-            line-height: 1.2; /* 숫자 높이 기준 */
+            line-height: 1.2;
         }
         #top-10-list .rank-id {
             font-weight: bold;
         }
         
-        /* 🔥 애니메이션 관련 스타일 수정 및 추가 🔥 */
+        /* 🔥 애니메이션 관련 스타일: 자릿수 기반 🔥 */
         .digit-container {
             display: inline-block;
             position: relative;
-            height: 1.2em; /* 텍스트 높이 기준 */
+            height: 1.2em;
             overflow: hidden;
             margin: 0;
             padding: 0;
@@ -69,10 +69,10 @@
             transform: translateY(0);
             transition: transform 0.5s ease-out;
             line-height: 1.2;
-            white-space: nowrap; /* 줄바꿈 방지 */
+            white-space: nowrap;
         }
         
-        .static-text { /* 콤마나 일반 텍스트 */
+        .static-text {
             display: inline-block;
             line-height: 1.2;
             vertical-align: top;
@@ -82,8 +82,9 @@
             display: flex;
             text-align: right;
             color: #007bff;
-            justify-content: flex-end; /* 숫자를 오른쪽 정렬 */
+            justify-content: flex-end;
             min-width: 100px; 
+            line-height: 1.2;
         }
 
         /* 게임 화면 스타일 */
@@ -98,6 +99,12 @@
             line-height: 1.2;
         }
         
+        /* 🔥 내 점수 스타일 (애니메이션 없음) 🔥 */
+        #my-pops-display {
+             line-height: 1.2;
+             display: inline-block;
+        }
+
         #popcat-image {
             width: 300px;
             height: auto;
@@ -168,7 +175,7 @@
         // ----------------------------------------------------
         const catImage = document.getElementById('popcat-image');
         const myPopsDisplay = document.getElementById('my-pops-display');
-        const totalPopsValue = document.getElementById('total-pops-value'); // 총합 애니메이션 대상
+        const totalPopsValue = document.getElementById('total-pops-value');
         const top10List = document.getElementById('top-10-list');
         const startScreen = document.getElementById('start-screen');
         const gameScreen = document.getElementById('game-screen');
@@ -177,15 +184,15 @@
         const currentUserDisplay = document.getElementById('current-user-id');
         
         let currentUserId = null;
+        let localPops = 0; // 로컬 클릭 수 (서버와 동기화)
         const closedImage = '귀엽다.png';
         const openImage = '귀엽다2.png';
         let rankingsInterval = null;
-        let myPopsInterval = null;
 
         // ----------------------------------------------------
         // 3. ID 입력 및 게임 시작
         // ----------------------------------------------------
-        function startGame() {
+        async function startGame() {
             const userId = userIdInput.value.trim();
             if (userId) {
                 currentUserId = userId;
@@ -193,24 +200,43 @@
                 startScreen.style.display = 'none';
                 gameScreen.style.display = 'block';
 
-                // 🔥 5초마다 개인 점수 업데이트 시작
-                updateMyPops(); // 초기 호출
-                myPopsInterval = setInterval(updateMyPops, 5000); 
+                // 🔥 최초 1회만 내 점수 로드
+                await loadMyPopsInitial();
                 
             } else {
                 alert("ID를 입력해 주세요.");
             }
         }
         startButton.addEventListener('click', startGame);
+        
+        // 🔥 내 점수 최초 1회 로드
+        async function loadMyPopsInitial() {
+            try {
+                const doc = await db.collection("users").doc(currentUserId).get();
+                if (doc.exists) {
+                    // NaN 방지 및 로컬 점수 동기화
+                    localPops = Number(doc.data().pops) || 0; 
+                    myPopsDisplay.textContent = localPops.toLocaleString();
+                } else {
+                    localPops = 0;
+                    myPopsDisplay.textContent = '0';
+                }
+            } catch (err) {
+                console.error(`내 클릭 수 로드 에러:`, err);
+            }
+        }
 
         // ----------------------------------------------------
-        // 4. 클릭 처리 및 데이터베이스 업데이트
+        // 4. 클릭 처리 및 데이터베이스 업데이트 (로컬 즉시 반영, 서버 전송)
         // ----------------------------------------------------
         async function handlePop() {
             if (!currentUserId) return;
 
             catImage.src = openImage;
             setTimeout(() => { catImage.src = closedImage; }, 80);
+
+            localPops++;
+            myPopsDisplay.textContent = localPops.toLocaleString(); // 애니메이션 없이 즉시 갱신
 
             const userRef = db.collection("users").doc(currentUserId);
             
@@ -219,11 +245,6 @@
                 await userRef.set({
                     pops: firebase.firestore.FieldValue.increment(1)
                 }, { merge: true });
-                
-                // 로컬 점수 즉시 반영 (애니메이션 적용)
-                const currentPops = Number(myPopsDisplay.textContent.replace(/,/g, '')) || 0;
-                updateNumberSmooth(myPopsDisplay, currentPops + 1);
-
             } catch (error) {
                 console.error("클릭 카운트 업데이트 실패:", error);
             }
@@ -246,31 +267,34 @@
             
             if (oldValue === newValue.toString()) return;
 
-            // 새로운 HTML을 생성하여 숫자를 자릿수별로 분리
             let newHtml = '';
-            let digitIndex = 0;
-
-            // 긴 쪽을 기준으로 루프를 돌림 (자릿수 증가/감소 대응)
+            
+            // 숫자가 짧아지거나 길어지는 경우를 포함하여 가장 긴 문자열을 기준으로 비교
             const maxLength = Math.max(oldFormattedValue.length, newFormattedValue.length);
+            
+            // 오른쪽(1의 자리)부터 왼쪽으로 비교
+            for (let i = 1; i <= maxLength; i++) {
+                const oldChar = oldFormattedValue.charAt(oldFormattedValue.length - i) || '';
+                const newChar = newFormattedValue.charAt(newFormattedValue.length - i) || '';
 
-            for (let i = 0; i < maxLength; i++) {
-                const oldChar = oldFormattedValue.charAt(oldFormattedValue.length - 1 - i) || '';
-                const newChar = newFormattedValue.charAt(newFormattedValue.length - 1 - i) || '';
-
-                if (oldChar === newChar || oldChar === ',' || newChar === ',') {
+                if (oldChar === newChar && oldChar !== '') {
                     // 숫자가 같거나 콤마인 경우: 고정된 텍스트
-                    newHtml = `<span class="static-text">${newChar || oldChar}</span>` + newHtml;
+                    newHtml = `<span class="static-text">${newChar}</span>` + newHtml;
                 } else {
-                    // 숫자가 변경되는 경우: 애니메이션 적용
+                    // 숫자가 변경되는 경우 (또는 자릿수 증가/감소): 애니메이션 적용
+                    
+                    // 빈 문자는 '공백'으로 처리하여 애니메이션 실행
+                    const displayOldChar = oldChar === '' ? '&nbsp;' : oldChar;
+                    const displayNewChar = newChar === '' ? '&nbsp;' : newChar;
+
                     newHtml = `
                         <span class="digit-container">
-                            <span class="digit-wrap" data-old="${oldChar}" data-new="${newChar}">
-                                <span>${oldChar}</span>
-                                <span style="display: block;">${newChar}</span>
+                            <span class="digit-wrap" data-old="${displayOldChar}" data-new="${displayNewChar}">
+                                <span>${displayOldChar}</span>
+                                <span style="display: block;">${displayNewChar}</span>
                             </span>
                         </span>
                     ` + newHtml;
-                    digitIndex++;
                 }
             }
 
@@ -280,48 +304,60 @@
             // 애니메이션 실행
             setTimeout(() => {
                 element.querySelectorAll('.digit-wrap').forEach(wrap => {
-                    // wrap의 높이만큼 위로 이동
-                    wrap.style.transform = `translateY(-${wrap.offsetHeight / 2}px)`; 
+                    // wrap의 높이(두 줄 높이)의 절반만큼 위로 이동하여 새 숫자가 중앙에 오도록
+                    const height = wrap.offsetHeight;
+                    wrap.style.transform = `translateY(-${height / 2}px)`; 
                 });
             }, 10);
         }
 
         // 🏆 순위표 리스트 업데이트 (자릿수 애니메이션 적용)
         function updateRankList(ranks) {
-            top10List.innerHTML = ''; // 기존 목록 초기화
+            
+            // 🚨 리스트 항목이 없는 경우 초기화
+            if (top10List.children.length === 0 || ranks.length === 0) {
+                 top10List.innerHTML = ranks.length === 0 ? '<li>아직 데이터가 없습니다.</li>' : '';
+            }
 
             ranks.forEach((r, i) => {
-                const li = document.createElement('li');
-                
-                // 순위 및 ID
-                const rankIdSpan = document.createElement('span');
-                rankIdSpan.className = 'rank-id';
-                rankIdSpan.textContent = `${i + 1}. ${r.id}`;
-                
-                // 점수 애니메이션 Wrapper
-                const popWrapper = document.createElement('span');
-                popWrapper.className = 'rank-pops';
-                
-                // 초기값 설정 및 애니메이션 적용 (이전에 updateNumberSmooth가 처리했으나, 5초 업데이트이므로 updateNumberSmooth로만 처리)
-                const popSpan = document.createElement('span');
-                popSpan.textContent = r.pops.toLocaleString(); // 초기값 표시
-                popSpan.id = `rank-pops-${r.id}`; // ID 부여
-                popWrapper.appendChild(popSpan);
-                
-                li.appendChild(rankIdSpan);
-                li.appendChild(popWrapper);
-                top10List.appendChild(li);
+                const listId = `rank-${r.id}`;
+                let li = document.getElementById(listId);
 
-                // 5초마다 호출될 때, 해당 ID의 점수를 애니메이션으로 업데이트
-                const existingEl = document.getElementById(`rank-pops-${r.id}`);
-                if(existingEl) {
-                    updateNumberSmooth(existingEl, r.pops);
+                if (!li) {
+                    // 새 항목이거나 리스트 초기화 후
+                    li = document.createElement('li');
+                    li.id = listId;
+
+                    // 순위 및 ID
+                    const rankIdSpan = document.createElement('span');
+                    rankIdSpan.className = 'rank-id';
+                    
+                    // 점수 Wrapper
+                    const popWrapper = document.createElement('span');
+                    popWrapper.className = 'rank-pops';
+                    
+                    // 점수 애니메이션 대상 (초기값 설정)
+                    const popSpan = document.createElement('span');
+                    popSpan.id = `rank-pops-${r.id}`;
+                    popSpan.textContent = r.pops.toLocaleString();
+                    popWrapper.appendChild(popSpan);
+                    
+                    li.appendChild(rankIdSpan);
+                    li.appendChild(popWrapper);
+                    top10List.appendChild(li);
+                }
+                
+                // 1. 순위/ID 갱신
+                li.querySelector('.rank-id').textContent = `${i + 1}. ${r.id}`;
+                
+                // 2. 점수 애니메이션 적용
+                const popSpanToUpdate = document.getElementById(`rank-pops-${r.id}`);
+                if(popSpanToUpdate) {
+                    updateNumberSmooth(popSpanToUpdate, r.pops);
                 }
             });
             
-            if (ranks.length === 0) {
-                 top10List.innerHTML = '<li>아직 데이터가 없습니다.</li>';
-            }
+            // 🚨 순위가 10위 밖으로 밀려난 항목 제거 (필요하다면 구현)
         }
 
 
@@ -341,7 +377,8 @@
                 const totalSnapshot = await db.collection("users").get();
                 
                 totalSnapshot.docs.forEach(doc => {
-                    totalPops += Number(doc.data().pops || 0); 
+                    // 🚨 NaN 방지
+                    totalPops += Number(doc.data().pops) || 0; 
                 });
 
                 // 3. 총합 애니메이션 적용
@@ -349,12 +386,9 @@
                 
                 // 4. 순위 리스트 업데이트
                 snapshot.docs.forEach((doc) => {
-                    ranks.push({ id: doc.id, pops: Number(doc.data().pops || 0) });
+                    // 🚨 NaN 방지
+                    ranks.push({ id: doc.id, pops: Number(doc.data().pops) || 0 }); 
                 });
-                
-                // 🚨 5초마다 순위를 업데이트할 때는, DOM을 한 번에 업데이트하는 것이 아닌,
-                // 개별 순위의 숫자만 애니메이션으로 업데이트합니다.
-                // 편의상 전체 리스트를 다시 그린 후 숫자에 애니메이션을 적용합니다.
                 updateRankList(ranks);
                 
             } catch (err) {
@@ -365,26 +399,6 @@
             }
         }
         
-        // 💵 5초마다 내 점수 업데이트 (폴링)
-        async function updateMyPops() {
-            if (!currentUserId) return; // ID가 있어야 실행
-            
-            try {
-                const doc = await db.collection("users").doc(currentUserId).get();
-                
-                if (doc.exists) {
-                    const myPops = Number(doc.data().pops || 0);
-                    // 🚨 내 점수에 애니메이션 적용
-                    updateNumberSmooth(myPopsDisplay, myPops);
-                } else {
-                    // 새 사용자인 경우
-                    updateNumberSmooth(myPopsDisplay, 0);
-                }
-            } catch (err) {
-                console.error(`내 클릭 수 업데이트 에러:`, err);
-            }
-        }
-
         // ----------------------------------------------------
         // 6. 시작 로직
         // ----------------------------------------------------
