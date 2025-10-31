@@ -1,3 +1,4 @@
+8초
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -5,7 +6,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>초록 때리기 (진짜 이거까지만 하고 간다)</title>
     <style>
-        /* ... (이전 스타일 코드와 동일) ... */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            user-select: none;
+            position: relative;
+        }
+        .digit-container {
+            position: relative;
+            overflow: hidden;
+            height: 1.2em;
+            display: inline-block;
+            vertical-align: top;
+            line-height: 1.2;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            width: 0.6em;
+            box-sizing: border-box;
+            white-space: nowrap;
+        }
+        .digit-number {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.4s ease-in-out;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+        .digit-number.new { transform: translateY(100%); }
+        .digit-number.enter { transform: translateY(0); }
+        .digit-number.exit { transform: translateY(-100%); }
+
+        #ranking-section {
+            position: absolute;
+            top: 15px; left: 15px;
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            min-width: 250px;
+        }
+        #total-pops-display {
+            font-size: 1.5em; font-weight: bold; color: #333;
+            margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;
+        }
+        #top-10-list { list-style: none; padding: 0; margin: 0; font-size: 0.95em; }
+        #top-10-list li { margin: 4px 0; display: flex; justify-content: space-between; line-height: 1.2; }
+        #top-10-list .rank-id { font-weight: bold; }
+        .rank-pops { text-align: right; color: #007bff; min-width: 100px; }
+
+        #start-screen { display: flex; flex-direction: column; align-items: center; }
+        #game-screen { display: none; text-align: center; }
+        #my-pops-display-wrapper {
+            font-size: 3.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #d9534f;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            line-height: 1.2;
+        }
+        #my-pops-display { line-height: 1.2; }
+        #popcat-image { width: 300px; height: auto; cursor: pointer; transition: transform 0.05s ease; }
+        #popcat-image:active { transform: scale(0.98); }
+        input, button {
+            padding: 12px 20px; font-size: 1.1em; margin-top: 15px;
+            border-radius: 8px; border: 1px solid #ccc; cursor: pointer;
+        }
     </style>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
@@ -19,7 +96,6 @@
         <hr>
         <h4>TOP 10 순위표</h4>
         <ul id="top-10-list"></ul>
-        <div id="usage-message"></div>
     </div>
 
     <div id="start-screen">
@@ -61,7 +137,6 @@
         const userIdInput = document.getElementById('user-id');
         const startButton = document.getElementById('start-button');
         const currentUserDisplay = document.getElementById('current-user-id');
-        const usageMessage = document.getElementById('usage-message');
 
         let currentUserId = null;
         let localPops = 0;
@@ -70,26 +145,8 @@
 
         // 폴링 관련
         let rankingsInterval = null;
-        let dailyUsageCheckInterval = null;
-        const POLLING_INTERVAL_NORMAL = 8000;  // 8초
-        const POLLING_INTERVAL_EXTENDED = 16000; // 16초
-
-        // 일일 쓰기 사용량 (클릭 횟수)
-        const DAILY_WRITES_COLLECTION = "dailyUsage";
-        const DAILY_WRITES_DOC = "stats";
-        const DAILY_WRITES_LIMIT = 25000;
-
-        // 일일 읽기 사용량 (랭킹 업데이트 횟수)
-        const DAILY_READS_COLLECTION = "dailyReads";
-        const DAILY_READS_DOC = "stats";
-        const DAILY_READS_LIMIT = 25000;
-
-        let currentPollingInterval = POLLING_INTERVAL_NORMAL;
-
-        // 초기화 관련
-        const LAST_RESET_DOC = "lastResetDate"; // 마지막 초기화 날짜를 저장할 문서 이름
-        const LAST_RESET_FIELD = "date"; // 마지막 초기화 날짜 필드명
-        const RESET_COLLECTION = "app_meta"; // 앱 메타데이터 저장 컬렉션
+        // 항상 8초 대기로 고정
+        const POLLING_INTERVAL = 8000; // 8초
 
         // ----------------- 게임 시작 -----------------
         startButton.addEventListener('click', startGame);
@@ -137,53 +194,22 @@
                 await db.collection("users").doc(currentUserId).set({
                     pops: firebase.firestore.FieldValue.increment(1)
                 }, { merge: true });
+            } catch (err) { console.error("클릭 업데이트 실패:", err); }
 
-                await db.collection(DAILY_WRITES_COLLECTION).doc(DAILY_WRITES_DOC).set({
-                    currentCount: firebase.firestore.FieldValue.increment(1)
-                }, { merge: true });
-
-            } catch (err) { console.error("클릭 또는 일일 쓰기 사용량 업데이트 실패:", err); }
-
-            checkAndAdjustPollingInterval();
+            // 클릭 시 폴링 간격 변경 로직 제거. 항상 POLLING_INTERVAL 유지.
+            // 필요하다면, 클릭 후 즉시 랭킹 업데이트를 한 번 수행할 수 있습니다.
+            // updateRankings();
         }
 
         // ----------------- 폴링 제어 -----------------
         function startPolling(interval) {
-            if (rankingsInterval && currentPollingInterval === interval) {
-                return;
-            }
-
             if (rankingsInterval) clearInterval(rankingsInterval);
 
-            currentPollingInterval = interval;
             rankingsInterval = setInterval(async () => {
                 await updateRankings();
-            }, currentPollingInterval);
+            }, interval);
 
-            console.log(`Polling started: interval=${currentPollingInterval / 1000}s`);
-        }
-
-        // ----------------- 일일 사용량 체크 및 폴링 간격 조정 -----------------
-        async function checkAndAdjustPollingInterval() {
-            try {
-                const dailyReadsDoc = await db.collection(DAILY_READS_COLLECTION).doc(DAILY_READS_DOC).get();
-                const currentDailyReads = dailyReadsDoc.exists ? Number(dailyReadsDoc.data().currentCount) || 0 : 0;
-
-                if (currentDailyReads >= DAILY_READS_LIMIT) {
-                    if (currentPollingInterval !== POLLING_INTERVAL_EXTENDED) {
-                        startPolling(POLLING_INTERVAL_EXTENDED);
-                        usageMessage.textContent = `일일 읽기 사용량 부족으로 업데이트 시간이 2배로 설정되었습니다. (현재: ${currentDailyReads}회)`;
-                    }
-                } else {
-                    if (currentPollingInterval !== POLLING_INTERVAL_NORMAL) {
-                        startPolling(POLLING_INTERVAL_NORMAL);
-                        usageMessage.textContent = "";
-                    }
-                }
-            } catch (err) {
-                console.error("일일 사용량 체크 중 오류:", err);
-                usageMessage.textContent = "일일 사용량 체크 중 오류가 발생했습니다.";
-            }
+            console.log(`Polling started: interval=${interval}ms`);
         }
 
         // ----------------- 숫자 애니메이션 -----------------
@@ -208,7 +234,7 @@
             }
 
             element.innerHTML = html;
-            void element.offsetHeight;
+            void element.offsetHeight; // reflow
 
             requestAnimationFrame(() => {
                 element.querySelectorAll(".digit-container").forEach(c => {
@@ -258,20 +284,10 @@
 
         // ----------------- 순위 및 전체 클릭 수 -----------------
         async function updateRankings(initialLoad = false) {
-            let totalPops = 0;
-            const ranks = [];
-            let readsThisUpdate = 0;
-
+            let totalPops = 0; const ranks = [];
             try {
-                // 상위 10개 문서 읽기 (readsThisUpdate에 포함)
                 const snapshot = await db.collection("users").orderBy("pops", "desc").limit(10).get();
-                readsThisUpdate += snapshot.docs.length;
-
-                // 모든 사용자 문서 읽기 (readsThisUpdate에 포함)
-                // 이 부분은 모든 문서를 읽으므로, 사용자 수가 많아지면 비용이 매우 커집니다.
-                // Cloud Function에서 총합을 계산하여 따로 저장하는 것을 고려해볼 수 있습니다.
                 const totalSnapshot = await db.collection("users").get();
-                readsThisUpdate += totalSnapshot.docs.length;
                 totalSnapshot.docs.forEach(doc => { totalPops += Number(doc.data().pops) || 0; });
 
                 if (initialLoad) { totalPopsValue.textContent = '0'; updateNumberSmooth(totalPopsValue, totalPops); }
@@ -279,12 +295,6 @@
 
                 snapshot.docs.forEach(doc => { ranks.push({ id: doc.id, pops: Number(doc.data().pops) || 0 }); });
                 updateRankList(ranks);
-
-                // 읽기 횟수를 Firebase에 업데이트
-                await db.collection(DAILY_READS_COLLECTION).doc(DAILY_READS_DOC).set({
-                    currentCount: firebase.firestore.FieldValue.increment(readsThisUpdate)
-                }, { merge: true });
-
             } catch (err) {
                 console.error("Firestore 오류:", err);
                 if (initialLoad) { totalPopsValue.textContent = '0'; updateNumberSmooth(totalPopsValue, 0); }
@@ -293,68 +303,11 @@
             }
         }
 
-        // ----------------- 일일 카운터 초기화 로직 (클라이언트 측 - 권장하지 않음) -----------------
-        async function resetDailyCountersIfNewDay() {
-            console.log("초기화 체크 중...");
-            try {
-                const metaDocRef = db.collection(RESET_COLLECTION).doc(LAST_RESET_DOC);
-                const metaDoc = await metaDocRef.get();
-                const lastResetDate = metaDoc.exists ? metaDoc.data()[LAST_RESET_FIELD] : null;
-
-                // 한국 시간으로 현재 날짜 생성
-                const now = new Date();
-                const kstOffset = 9 * 60 * 60 * 1000; // 9 hours in milliseconds
-                const kstDate = new Date(now.getTime() + kstOffset);
-                const todayKSTString = kstDate.toISOString().split('T')[0]; // "YYYY-MM-DD" 형식
-
-                let shouldReset = false;
-                if (!lastResetDate) {
-                    // 첫 실행 시 초기화
-                    console.log("마지막 초기화 날짜 없음. 초기화 진행.");
-                    shouldReset = true;
-                } else {
-                    const lastResetKSTDate = new Date(new Date(lastResetDate).getTime() + kstOffset);
-                    const lastResetKSTString = lastResetKSTDate.toISOString().split('T')[0];
-
-                    if (todayKSTString !== lastResetKSTString) {
-                        // 날짜가 바뀌었으면 초기화
-                        console.log(`날짜 변경 감지: 이전 날짜=${lastResetKSTString}, 현재 날짜=${todayKSTString}. 초기화 진행.`);
-                        shouldReset = true;
-                    }
-                }
-
-                if (shouldReset) {
-                    console.log("일일 카운터 초기화 실행!");
-                    const batch = db.batch();
-
-                    const dailyReadsRef = db.collection(DAILY_READS_COLLECTION).doc(DAILY_READS_DOC);
-                    batch.set(dailyReadsRef, { currentCount: 0 }, { merge: true });
-
-                    const dailyWritesRef = db.collection(DAILY_WRITES_COLLECTION).doc(DAILY_WRITES_DOC);
-                    batch.set(dailyWritesRef, { currentCount: 0 }, { merge: true });
-
-                    await batch.commit();
-                    await metaDocRef.set({ [LAST_RESET_FIELD]: now.toISOString() }, { merge: true }); // UTC 시간으로 저장
-                    console.log("일일 카운터 초기화 완료 및 마지막 초기화 날짜 업데이트.");
-                } else {
-                    console.log("같은 날짜, 초기화 불필요.");
-                }
-
-            } catch (err) {
-                console.error("일일 카운터 초기화 중 오류:", err);
-            }
-        }
-
-
         document.addEventListener('DOMContentLoaded', async () => {
-            await resetDailyCountersIfNewDay(); // 페이지 로드 시 초기화 체크
             await updateRankings(true);
-            await checkAndAdjustPollingInterval();
-            // 이후 매 분마다 일일 사용량 체크 및 폴링 간격 조정 (1분 = 60000ms)
-            dailyUsageCheckInterval = setInterval(checkAndAdjustPollingInterval, 60000);
-            // 매 시간마다 초기화 체크 (더 자주 체크하고 싶다면 간격 조정)
-            setInterval(resetDailyCountersIfNewDay, 1 * 60 * 60 * 1000); // 1시간마다 초기화 체크
+            startPolling(POLLING_INTERVAL); // 항상 8초 폴링 시작
         });
     </script>
 </body>
 </html>
+
