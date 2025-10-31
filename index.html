@@ -17,21 +17,18 @@
             position: relative;
         }
 
-        /* -------------------------------------------
-           🔥 애니메이션 관련 핵심 스타일 🔥
-           ------------------------------------------- */
+        /* ------------------------------------------- */
         .digit-container {
             position: relative;
             overflow: hidden;
-            height: 1.2em; 
+            height: 1.2em;
             display: inline-block;
             vertical-align: top;
             line-height: 1.2;
             margin: 0;
             padding: 0;
             text-align: center;
-            /* 핵심: 고정 너비 → 숫자·콤마 모두 같은 폭 */
-            width: 0.6em;          /* Arial 기준 0.6em이면 딱 맞음 */
+            width: 0.6em;           /* 숫자 간격 고정 */
             box-sizing: border-box;
         }
 
@@ -44,38 +41,23 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            transition: transform 0.4s ease-in-out; 
+            transition: transform 0.4s ease-in-out;
             line-height: 1.2;
-            /* 콤마 등의 고정된 텍스트도 이 스타일을 따라야 하므로 top:0으로 고정합니다. */
-        }
-        
-        /* 시작 위치 (화면 밖 아래) */
-        .digit-number.new {
-            transform: translateY(100%);
         }
 
-        /* 애니메이션 종료 위치 (중앙) */
-        .digit-number.enter {
-            transform: translateY(0);
-        }
+        .digit-number.new { transform: translateY(100%); }
+        .digit-number.enter { transform: translateY(0); }
+        .digit-number.exit { transform: translateY(-100%); }
 
-        /* 사라지는 위치 (화면 밖 위) */
-        .digit-number.exit {
-            transform: translateY(-100%);
-        }
-
-        /* 고정된 텍스트 (콤마 등) */
         .static-text {
             display: inline-block;
             line-height: 1.2;
             vertical-align: top;
-            padding: 0 1px; /* 콤마의 공간 확보 */
+            padding: 0 1px;
             min-width: 0.35em;
         }
-        
-        /* -------------------------------------------
-           일반 레이아웃 스타일 (이전과 동일)
-           ------------------------------------------- */
+
+        /* ------------------------------------------- */
         #ranking-section {
             position: absolute;
             top: 15px;
@@ -114,22 +96,22 @@
             text-align: right;
             color: #007bff;
             justify-content: flex-end;
-            min-width: 100px; 
+            min-width: 100px;
             line-height: 1.2;
         }
         #start-screen { display: flex; flex-direction: column; align-items: center; }
         #game-screen { display: none; text-align: center; }
-        #my-pops-display-wrapper { 
-            font-size: 3.5em; 
+        #my-pops-display-wrapper {
+            font-size: 3.5em;
             font-weight: bold;
             margin-bottom: 10px;
             color: #d9534f;
-            display: block; 
+            display: block;
             line-height: 1.2;
         }
         #my-pops-display {
-             line-height: 1.2;
-             display: inline-block;
+            line-height: 1.2;
+            display: inline-block;
         }
         #popcat-image {
             width: 300px;
@@ -138,11 +120,11 @@
             transition: transform 0.05s ease;
         }
         #popcat-image:active { transform: scale(0.98); }
-        input, button { 
+        input, button {
             padding: 12px 20px;
-            font-size: 1.1em; 
-            margin-top: 15px; 
-            border-radius: 8px; 
+            font-size: 1.1em;
+            margin-top: 15px;
+            border-radius: 8px;
             border: 1px solid #ccc;
             cursor: pointer;
         }
@@ -152,9 +134,9 @@
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
 </head>
 <body>
-    
+
     <div id="ranking-section">
-        <h3>🏆 전체 클릭 수</h3>
+        <h3>전체 클릭 수</h3>
         <div id="total-pops-display">
             <div id="total-pops-value" style="display:inline-block;">로딩 중...</div>
         </div>
@@ -166,7 +148,7 @@
     <div id="start-screen">
         <h2>초록 때리기</h2>
         <input type="text" id="user-id" placeholder="나만의 ID를 입력하세요">
-        <button id="start-button">게임 시작</button> 
+        <button id="start-button">게임 시작</button>
         <p style="margin-top: 20px; color: #666;">* 클릭 횟수는 이 ID에 누적됩니다.</p>
     </div>
 
@@ -175,29 +157,28 @@
         <div id="my-pops-display-wrapper">
             <span id="my-pops-display">0</span>
         </div>
-        
         <img id="popcat-image" src="귀엽다.png" alt="팝캣">
         <div class="instruction" style="color:#444; margin-top: 10px;">당신의 ID: <strong id="current-user-id"></strong></div>
     </div>
-    
+
     <script>
         // ----------------------------------------------------
-        // 1. Firebase 설정 초기화 (생략)
+        // 1. Firebase 설정
         // ----------------------------------------------------
         const firebaseConfig = {
-          apiKey: "AIzaSyA6OwwtJNtTqujb6PW6nolYmstOj7zBqCA", 
-          authDomain: "drawgreen-3bc38.firebaseapp.com",
-          projectId: "drawgreen-3bc38",
-          storageBucket: "drawgreen-3bc38.firebasestorage.app",
-          messagingSenderId: "1050500469107",
-          appId: "1:1050500469107:web:6c25e893e7c12500f23506"
+            apiKey: "AIzaSyA6OwwtJNtTqujb6PW6nolYmstOj7zBqCA",
+            authDomain: "drawgreen-3bc38.firebaseapp.com",
+            projectId: "drawgreen-3bc38",
+            storageBucket: "drawgreen-3bc38.firebasestorage.app",
+            messagingSenderId: "1050500469107",
+            appId: "1:1050500469107:web:6c25e893e7c12500f23506"
         };
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
         // ----------------------------------------------------
-        // 2. DOM 요소 및 변수 (생략)
+        // 2. DOM 요소 및 변수
         // ----------------------------------------------------
         const catImage = document.getElementById('popcat-image');
         const myPopsDisplay = document.getElementById('my-pops-display');
@@ -208,15 +189,17 @@
         const userIdInput = document.getElementById('user-id');
         const startButton = document.getElementById('start-button');
         const currentUserDisplay = document.getElementById('current-user-id');
-        
+
         let currentUserId = null;
         let localPops = 0;
         const closedImage = '귀엽다.png';
         const openImage = '귀엽다2.png';
         let rankingsInterval = null;
+        let lastClickTime = Date.now();
+        let currentPollingInterval = 5000;
 
         // ----------------------------------------------------
-        // 3. ID 입력 및 게임 시작 (생략)
+        // 3. 게임 시작
         // ----------------------------------------------------
         async function startGame() {
             const userId = userIdInput.value.trim();
@@ -231,16 +214,16 @@
             }
         }
         startButton.addEventListener('click', startGame);
-        
+
         async function loadMyPopsInitial() {
             try {
                 const doc = await db.collection("users").doc(currentUserId).get();
                 if (doc.exists) {
-                    localPops = Number(doc.data().pops) || 0; 
-                    myPopsDisplay.textContent = localPops.toLocaleString();
+                    localPops = Number(doc.data().pops) || 0;
+                    updateNumberSmooth(myPopsDisplay, localPops);
                 } else {
                     localPops = 0;
-                    myPopsDisplay.textContent = '0';
+                    updateNumberSmooth(myPopsDisplay, 0);
                 }
             } catch (err) {
                 console.error(`내 클릭 수 로드 에러:`, err);
@@ -248,14 +231,15 @@
         }
 
         // ----------------------------------------------------
-        // 4. 클릭 처리 및 DB 업데이트 (생략)
+        // 4. 클릭 처리
         // ----------------------------------------------------
         async function handlePop() {
             if (!currentUserId) return;
             catImage.src = openImage;
             setTimeout(() => { catImage.src = closedImage; }, 80);
             localPops++;
-            myPopsDisplay.textContent = localPops.toLocaleString(); 
+            updateNumberSmooth(myPopsDisplay, localPops);
+
             const userRef = db.collection("users").doc(currentUserId);
             try {
                 await userRef.set({
@@ -264,22 +248,29 @@
             } catch (error) {
                 console.error("클릭 카운트 업데이트 실패:", error);
             }
+
+            // 클릭 시 5초 폴링 복귀
+            lastClickTime = Date.now();
+            if (currentPollingInterval !== 5000) {
+                clearInterval(rankingsInterval);
+                currentPollingInterval = 5000;
+                rankingsInterval = setInterval(updateRankings, 5000);
+            }
         }
         catImage.addEventListener('mousedown', handlePop);
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && !e.repeat && currentUserId) {
-                e.preventDefault(); 
+                e.preventDefault();
                 handlePop();
             }
         });
 
         // ----------------------------------------------------
-        // 5. 🔥 자릿수 기반 애니메이션 함수 (최종 안정화 버전) 🔥
+        // 5. 자릿수 애니메이션 (숫자 변하지 않으면 스킵)
         // ----------------------------------------------------
         function updateNumberSmooth(element, newValue) {
-            // 1. 기존값 파싱
             const oldText = element.textContent.replace(/,/g, "") || "0";
-            const oldVal   = Number(oldText) || 0;
+            const oldVal = Number(oldText) || 0;
             if (oldVal === newValue) return;
 
             const oldStr = oldVal.toLocaleString();
@@ -287,11 +278,9 @@
             const maxLen = Math.max(oldStr.length, newStr.length);
 
             let html = "";
-
             for (let i = 1; i <= maxLen; i++) {
                 const oldChar = oldStr.charAt(oldStr.length - i) || "";
                 const newChar = newStr.charAt(newStr.length - i) || "";
-
                 if (oldChar === newChar && oldChar !== "" && oldChar !== ",") {
                     html = `<span class="static-text">${newChar}</span>` + html;
                 } else if (oldChar === "," || newChar === ",") {
@@ -307,13 +296,9 @@
                 }
             }
 
-            // 2. DOM 교체
             element.innerHTML = html;
-
-            // 3. 강제 리플로우 → 브라우저가 새 레이아웃을 확실히 인식
             void element.offsetHeight;
 
-            // 4. 다음 페인트 사이클에 애니메이션 시작
             requestAnimationFrame(() => {
                 element.querySelectorAll(".digit-container").forEach(c => {
                     const old = c.querySelector(".digit-number.old");
@@ -326,7 +311,6 @@
                 });
             });
 
-            // 5. 애니메이션 종료 후 정리 (0.4s와 일치)
             setTimeout(() => {
                 element.querySelectorAll(".digit-number.old").forEach(e => e.remove());
                 element.querySelectorAll(".digit-number.enter").forEach(e => {
@@ -336,136 +320,117 @@
             }, 400);
         }
 
-        // 🏆 순위표 리스트 업데이트 (생략)
+        // ----------------------------------------------------
+        // 6. 순위표 업데이트 (처음 생성 시에도 애니메이션)
+        // ----------------------------------------------------
         function updateRankList(ranks) {
-            
             if (ranks.length === 0) {
                 top10List.innerHTML = '<li>아직 데이터가 없습니다.</li>';
                 return;
             }
-            
+
             const currentRankIds = new Set(ranks.map(r => `rank-${r.id}`));
-            
             Array.from(top10List.children).forEach(li => {
-                if (!currentRankIds.has(li.id)) {
-                    li.remove();
-                }
+                if (!currentRankIds.has(li.id)) li.remove();
             });
 
             ranks.forEach((r, i) => {
                 const listId = `rank-${r.id}`;
-                let li = document.getElementById(listId);
                 const popSpanId = `rank-pops-${r.id}`;
+                let li = document.getElementById(listId);
+                let popSpanToUpdate = null;
 
                 if (!li) {
                     li = document.createElement('li');
                     li.id = listId;
                     li.style.lineHeight = '1.2';
-                    
+
                     const rankIdSpan = document.createElement('span');
                     rankIdSpan.className = 'rank-id';
-                    
+
                     const popWrapper = document.createElement('span');
                     popWrapper.className = 'rank-pops';
-                    
+
                     const popSpan = document.createElement('span');
                     popSpan.id = popSpanId;
-                    // 🔥 초기에는 애니메이션 없이 텍스트 설정
-                    popSpan.textContent = r.pops.toLocaleString();
-                    
+
+                    updateNumberSmooth(popSpan, r.pops);  // 처음 생성 시 애니메이션
+
                     popWrapper.appendChild(popSpan);
                     li.appendChild(rankIdSpan);
                     li.appendChild(popWrapper);
-                    
-                    const existingChildren = Array.from(top10List.children);
-                    if (i < existingChildren.length) {
-                        top10List.insertBefore(li, existingChildren[i]);
+
+                    const existing = Array.from(top10List.children);
+                    if (i < existing.length) {
+                        top10List.insertBefore(li, existing[i]);
                     } else {
                         top10List.appendChild(li);
                     }
-                    
-                    // 🔥 초기 렌더링 후 애니메이션 구조로 한 번 변환 (다음 업데이트부터 애니메이션 가능)
-                    setTimeout(() => {
-                        updateNumberSmooth(popSpan, r.pops);
-                    }, 50);
-
-                } else if (li.nextSibling && li.nextSibling.id !== `rank-${ranks[i+1]?.id}`) {
-                    const targetSibling = top10List.children[i];
-                    if (li !== targetSibling) {
-                        top10List.insertBefore(li, targetSibling);
-                    }
+                } else {
+                    popSpanToUpdate = li.querySelector(`#${popSpanId}`);
                 }
 
                 const rankIdSpan = li.querySelector('.rank-id');
-                const popSpanToUpdate = li.querySelector(`#${popSpanId}`);
-                
                 rankIdSpan.textContent = `${i + 1}. ${r.id}`;
 
-                if(popSpanToUpdate) {
-                    // 🔥 새로운 애니메이션 적용
-                    updateNumberSmooth(popSpanToUpdate, r.pops); 
+                if (popSpanToUpdate) {
+                    updateNumberSmooth(popSpanToUpdate, r.pops);
                 }
             });
         }
 
-
-        // 🥇 5초마다 순위와 전체 합계 업데이트 (폴링)
+        // ----------------------------------------------------
+        // 7. 순위 및 합계 업데이트 (20초 무클릭 → 1분 폴링)
+        // ----------------------------------------------------
         async function updateRankings() {
             let totalPops = 0;
             const ranks = [];
-            
+
             try {
-                // 1. TOP 10 데이터 가져오기 
                 const snapshot = await db.collection("users")
                     .orderBy("pops", "desc")
                     .limit(10)
                     .get();
 
-                // 2. 전체 합계 계산을 위한 전체 데이터 가져오기 
                 const totalSnapshot = await db.collection("users").get();
-                
                 if (totalSnapshot && totalSnapshot.docs) {
                     totalSnapshot.docs.forEach(doc => {
-                        totalPops += Number(doc.data().pops) || 0; 
+                        totalPops += Number(doc.data().pops) || 0;
                     });
                 }
-                
-                // 3. 총합 애니메이션 적용
+
                 updateNumberSmooth(totalPopsValue, totalPops);
-                
-                // 4. 순위 리스트 업데이트
-                snapshot.docs.forEach((doc) => {
-                    ranks.push({ id: doc.id, pops: Number(doc.data().pops) || 0 }); 
+
+                snapshot.docs.forEach(doc => {
+                    ranks.push({ id: doc.id, pops: Number(doc.data().pops) || 0 });
                 });
                 updateRankList(ranks);
-                
+
+                // 20초 이상 클릭 없으면 1분 폴링
+                if (Date.now() - lastClickTime > 20000 && currentPollingInterval !== 60000) {
+                    clearInterval(rankingsInterval);
+                    currentPollingInterval = 60000;
+                    rankingsInterval = setInterval(updateRankings, 60000);
+                }
+
             } catch (err) {
                 console.error("Firestore 순위 업데이트 오류:", err);
-                updateNumberSmooth(totalPopsValue, 0); 
+                updateNumberSmooth(totalPopsValue, 0);
                 if (top10List.children.length === 0) {
-                     top10List.innerHTML = '<li>순위 로딩 오류 (콘솔 확인)</li>';
+                    top10List.innerHTML = '<li>순위 로딩 오류 (콘솔 확인)</li>';
                 }
             }
         }
-        
+
         // ----------------------------------------------------
-        // 6. 시작 로직
+        // 8. 시작 로직
         // ----------------------------------------------------
-        updateRankings(); 
-        
-        // 🔥 5초마다 순위 업데이트 시작
-        rankingsInterval = setInterval(updateRankings, 5000); 
-        
-        // 🔥 초기화 시 합계 부분 애니메이션 구조로 한 번 변환
+        updateRankings();
+        rankingsInterval = setInterval(updateRankings, 5000);
+
         document.addEventListener('DOMContentLoaded', () => {
-             setTimeout(() => {
-                 updateNumberSmooth(totalPopsValue, 0); 
-            }, 50);
+            setTimeout(() => updateNumberSmooth(totalPopsValue, 0), 50);
         });
-
     </script>
-
 </body>
 </html>
-
-
