@@ -1,263 +1,222 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>멀티플레이 초록그림</title>
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            user-select: none;
-            position: relative; /* 절대 위치 배치를 위한 기준점 */
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>초록그림 때리기</title>
+<style>
+    body {
+        font-family: 'Noto Sans KR', sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        background: #fffaf5;
+        margin: 0;
+    }
 
-        /* 전체 순위 섹션 스타일 */
-        #ranking-section {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            background-color: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            min-width: 250px;
-        }
-        #total-pops-display {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
-        }
-        #top-10-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            font-size: 0.95em;
-        }
-        #top-10-list li {
-            margin: 4px 0;
-            display: flex;
-            justify-content: space-between;
-        }
-        #top-10-list .rank-id {
-            font-weight: bold;
-        }
-        #top-10-list .rank-pops {
-            color: #007bff;
-        }
+    h1 {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
 
-        /* 게임 화면 스타일 */
-        #start-screen { display: flex; flex-direction: column; align-items: center; }
-        #game-screen { display: none; text-align: center; }
-        #my-pops-display { /* 개인 클릭 수 */
-            font-size: 3.5em; 
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #d9534f; /* 눈에 띄는 색상 */
-        }
-        #popcat-image {
-            width: 300px;
-            height: auto;
-            cursor: pointer;
-            transition: transform 0.05s ease;
-        }
-        #popcat-image:active { transform: scale(0.98); }
-        input, button { 
-            padding: 12px 20px;
-            font-size: 1.1em; 
-            margin-top: 15px; 
-            border-radius: 8px; 
-            border: 1px solid #ccc;
-            cursor: pointer;
-        }
-    </style>
+    #cat {
+        width: 220px;
+        cursor: pointer;
+        transition: transform 0.1s ease;
+    }
+    #cat:active { transform: scale(0.95); }
 
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+    .counter {
+        font-size: 2.2rem;
+        margin-top: 0.5rem;
+        font-weight: bold;
+    }
+
+    #totalPops {
+        margin-top: 1.2rem;
+        font-size: 1.6rem;
+        color: #444;
+    }
+
+    ul {
+        list-style: none;
+        padding: 0;
+        margin-top: 2rem;
+        width: 300px;
+    }
+
+    li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 6px 0;
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: #f7f7f7;
+        overflow: hidden;
+        height: 1.6em;
+    }
+
+    .num-wrapper {
+        position: relative;
+        height: 1.2em;
+        overflow: hidden;
+    }
+
+    .num-slide {
+        position: absolute;
+        width: 100%;
+        top: 0;
+        transition: transform 0.5s ease, opacity 0.5s ease;
+    }
+
+    .slide-up {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+
+    .slide-in {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    .rank-id { font-weight: bold; }
+</style>
 </head>
 <body>
-    
-    <div id="ranking-section">
-        <h3>🏆 전체 클릭 수</h3>
-        <div id="total-pops-display">로딩 중...</div>
-        <hr>
-        <h4>TOP 10 순위표</h4>
-        <ul id="top-10-list">
-            </ul>
-    </div>
 
-    <div id="start-screen">
-        <h2>초록 때리기</h2>
-        <input type="text" id="user-id" placeholder="나만의 ID를 입력하세요">
-        <button id="start-button">게임 시작</button> 
-        <p style="margin-top: 20px; color: #666;">* 클릭 횟수는 이 ID에 누적됩니다.</p>
-    </div>
+<h1>초록 때리기</h1>
+<img id="cat" src="https://popcat.click/img/cat1.png" alt="popcat">
+<div class="counter">내 점수: <span id="myPops">0</span></div>
+<div id="totalPops">전체 Pops: 
+    <span class="num-wrapper"><span id="totalPopsDisplay" class="num-slide">0</span></span>
+</div>
+<ul id="top10List"></ul>
 
-    <div id="game-screen">
-        <p style="font-size:1.2em; margin-bottom: 5px;">내 클릭 수</p>
-        <div id="my-pops-display">0</div>
-        <img id="popcat-image" src="귀엽다.png" alt="팝캣">
-        <div class="instruction" style="color:#444; margin-top: 10px;">당신의 ID: <strong id="current-user-id"></strong></div>
-    </div>
-    
-    <script>
-        // ----------------------------------------------------
-        // 1. Firebase 설정 초기화
-        // ----------------------------------------------------
-        
-        // ⚠️ 이 부분을 반드시 사용자님의 실제 Firebase 설정 코드로 대체하세요!
-        const firebaseConfig = {
-          apiKey: "AIzaSyA6OwwtJNtTqujb6PW6nolYmstOj7zBqCA", 
-          authDomain: "drawgreen-3bc38.firebaseapp.com",
-          projectId: "drawgreen-3bc38",
-          storageBucket: "drawgreen-3bc38.firebasestorage.app",
-          messagingSenderId: "1050500469107",
-          appId: "1:1050500469107:web:6c25e893e7c12500f23506"
-        };
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyA6OwwtJNtTqujb6PW6nolYmstOj7zBqCA",
+    authDomain: "drawgreen-3bc38.firebaseapp.com",
+    projectId: "drawgreen-3bc38"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+const catImage = document.getElementById("cat");
+const myPopsDisplay = document.getElementById("myPops");
+const totalPopsDisplay = document.getElementById("totalPopsDisplay");
+const top10List = document.getElementById("top10List");
 
-        // ----------------------------------------------------
-        // 2. DOM 요소 및 변수
-        // ----------------------------------------------------
-        const catImage = document.getElementById('popcat-image');
-        const myPopsDisplay = document.getElementById('my-pops-display'); // 내 클릭 수 표시
-        const totalPopsDisplay = document.getElementById('total-pops-display'); // 전체 클릭 수 표시
-        const top10List = document.getElementById('top-10-list'); // TOP 10 리스트
-        const startScreen = document.getElementById('start-screen');
-        const gameScreen = document.getElementById('game-screen');
-        const userIdInput = document.getElementById('user-id');
-        const startButton = document.getElementById('start-button');
-        const currentUserDisplay = document.getElementById('current-user-id');
-        const sound = document.getElementById('pop-sound');
-        
-        let currentUserId = null;
-        const closedImage = '귀엽다.png';
-        const openImage = '귀엽다2.png';
+const closedImage = "https://popcat.click/img/cat1.png";
+const openImage = "https://popcat.click/img/cat2.png";
+const currentUserId = "Guest" + Math.floor(Math.random() * 9999);
 
-        // ----------------------------------------------------
-        // 3. ID 입력 및 게임 시작
-        // ----------------------------------------------------
-        function startGame() {
-            const userId = userIdInput.value.trim();
-            if (userId) {
-                currentUserId = userId;
-                currentUserDisplay.textContent = currentUserId;
-                startScreen.style.display = 'none';
-                gameScreen.style.display = 'block';
-                
-                // 순위 및 전체 카운트 구독 시작 (로그인과 무관하게 실행)
-                subscribeToRankings(); 
+let localPops = 0;
+let lastSynced = 0;
+let prevTotal = 0;
+let prevRanks = [];
 
-                // 내 클릭 수 구독 시작
-                subscribeToMyPops();
-            } else {
-                alert("ID를 입력해 주세요.");
-            }
-        }
-        startButton.addEventListener('click', startGame);
+// 🐾 클릭 시 점수 증가
+async function handlePop() {
+    catImage.src = openImage;
+    setTimeout(() => catImage.src = closedImage, 80);
+    localPops++;
+    myPopsDisplay.textContent = localPops.toLocaleString();
 
-        // ----------------------------------------------------
-        // 4. 클릭 처리 및 데이터베이스 업데이트
-        // ----------------------------------------------------
-        async function handlePop() {
-            if (!currentUserId) return;
+    if (localPops - lastSynced >= 10) {
+        const userRef = db.collection("users").doc(currentUserId);
+        await userRef.set({
+            pops: firebase.firestore.FieldValue.increment(localPops - lastSynced)
+        }, { merge: true });
+        lastSynced = localPops;
+    }
+}
+catImage.addEventListener("click", handlePop);
 
-            // 이미지 및 소리 변경 (프론트엔드 반응)
-            catImage.src = openImage;
-            if (sound) { sound.currentTime = 0; sound.play(); }
-            setTimeout(() => { catImage.src = closedImage; }, 80);
+// 🎞️ 숫자 전환 애니메이션
+function updateNumberSmooth(element, newValue) {
+    const oldValue = element.textContent.replace(/,/g, "");
+    if (oldValue === newValue.toString()) return;
 
-            const userRef = db.collection("users").doc(currentUserId);
-            
-            try {
-                // 현재 ID의 팝 카운트를 1 증가
-                await userRef.set({
-                    pops: firebase.firestore.FieldValue.increment(1)
-                }, { merge: true });
-            } catch (error) {
-                console.error("클릭 카운트 업데이트 실패:", error);
-            }
-        }
-        catImage.addEventListener('mousedown', handlePop);
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && !e.repeat && currentUserId) {
-                e.preventDefault(); 
-                handlePop();
-            }
+    const newEl = document.createElement("span");
+    newEl.className = "num-slide";
+    newEl.textContent = newValue.toLocaleString();
+    newEl.style.transform = "translateY(100%)";
+    newEl.style.opacity = "0";
+    element.parentNode.appendChild(newEl);
+
+    requestAnimationFrame(() => {
+        element.classList.add("slide-up");
+        newEl.classList.add("slide-in");
+        newEl.style.transform = "translateY(0)";
+        newEl.style.opacity = "1";
+    });
+
+    setTimeout(() => {
+        element.parentNode.removeChild(element);
+        newEl.id = element.id;
+    }, 500);
+}
+
+// 🏆 순위 갱신
+async function updateRankingsSmooth() {
+    try {
+        const snapshot = await db.collection("users")
+            .orderBy("pops", "desc")
+            .limit(10)
+            .get();
+
+        let total = 0;
+        const ranks = [];
+
+        snapshot.docs.forEach((doc, index) => {
+            const data = doc.data();
+            const pops = data.pops || 0;
+            total += pops;
+            ranks.push({ id: doc.id, pops });
         });
 
-        // ----------------------------------------------------
-        // 5. 순위 및 전체 카운트 실시간 구독 (메인 로직)
-        // ----------------------------------------------------
+        updateNumberSmooth(totalPopsDisplay, total);
+        prevTotal = total;
 
-        function subscribeToRankings() {
-            db.collection("users")
-              .orderBy("pops", "desc")
-              .onSnapshot(snapshot => {
-                let totalPops = 0;
-                let rankHtml = '';
+        updateRankListSmooth(ranks);
+        prevRanks = ranks;
 
-                snapshot.docs.forEach((doc, index) => {
-                    const data = doc.data();
-                    const pops = data.pops || 0;
-                    totalPops += pops;
+    } catch (err) {
+        console.error("Firestore 읽기 오류:", err);
+    }
+}
 
-                    if (index < 10) {
-                        const id = doc.id;
-                        const rank = index + 1;
-                        rankHtml += `
-                            <li>
-                                <span class="rank-id">${rank}. ${id}</span>
-                                <span class="rank-pops">${pops.toLocaleString()}</span>
-                            </li>
-                        `;
-                    }
-                });
+// 순위표 애니메이션 전환
+function updateRankListSmooth(ranks) {
+    if (top10List.children.length === 0) {
+        top10List.innerHTML = ranks.map((r, i) => `
+            <li>
+                <span class="rank-id">${i + 1}. ${r.id}</span>
+                <span class="num-wrapper">
+                    <span class="num-slide">${r.pops.toLocaleString()}</span>
+                </span>
+            </li>
+        `).join('');
+        return;
+    }
 
-                totalPopsDisplay.textContent = totalPops.toLocaleString();
-                top10List.innerHTML = rankHtml || '<li>아직 데이터가 없습니다.</li>';
+    ranks.forEach((r, i) => {
+        const li = top10List.children[i];
+        if (!li) return;
+        li.querySelector(".rank-id").textContent = `${i + 1}. ${r.id}`;
+        const numEl = li.querySelector(".num-slide");
+        updateNumberSmooth(numEl, r.pops);
+    });
+}
 
-            }, err => {
-                console.error(`Firestore 순위 구독 에러:`, err);
-            });
-        }
-        
-        // ----------------------------------------------------
-        // 6. 내 클릭 수 실시간 구독
-        // ----------------------------------------------------
-        function subscribeToMyPops() {
-            // 현재 로그인된 사용자 ID의 문서만 실시간으로 구독
-            db.collection("users").doc(currentUserId)
-              .onSnapshot(doc => {
-                if (doc.exists) {
-                    const myPops = doc.data().pops || 0;
-                    myPopsDisplay.textContent = myPops.toLocaleString();
-                } else {
-                    // 새 사용자인 경우
-                    myPopsDisplay.textContent = '0';
-                }
-              }, err => {
-                console.error(`내 클릭 수 구독 에러:`, err);
-              });
-        }
-        
-        // 게임 시작 전에도 순위는 보여줍니다.
-        subscribeToRankings(); 
-    </script>
-
+// ⏱ 5초마다 Firestore에서 업데이트
+updateRankingsSmooth();
+setInterval(updateRankingsSmooth, 5000);
+</script>
 </body>
 </html>
-
-
-
-
