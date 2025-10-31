@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>멀티플레이 초록그림 (애니메이션 완벽 수정)</title>
+    <title>멀티플레이 초록그림 (쉼표 제거 + 애니메이션 안정화)</title>
     <style>
         body {
             display: flex;
@@ -46,14 +46,6 @@
         .digit-number.enter { transform: translateY(0); }
         .digit-number.exit { transform: translateY(-100%); }
 
-        .static-text {
-            display: inline-block;
-            line-height: 1.2;
-            vertical-align: top;
-            padding: 0 1px;
-            min-width: 0.35em;
-        }
-
         #ranking-section {
             position: absolute;
             top: 15px; left: 15px;
@@ -70,7 +62,7 @@
         #top-10-list { list-style: none; padding: 0; margin: 0; font-size: 0.95em; }
         #top-10-list li { margin: 4px 0; display: flex; justify-content: space-between; line-height: 1.2; }
         #top-10-list .rank-id { font-weight: bold; }
-        .rank-pops { display: flex; text-align: right; color: #007bff; justify-content: flex-end; min-width: 100px; line-height: 1.2; }
+        .rank-pops { text-align: right; color: #007bff; min-width: 100px; }
 
         #start-screen { display: flex; flex-direction: column; align-items: center; }
         #game-screen { display: none; text-align: center; }
@@ -173,26 +165,22 @@
         async function loadMyPopsInitial() {
             try {
                 const doc = await db.collection("users").doc(currentUserId).get();
-                if (doc.exists) {
-                    localPops = Number(doc.data().pops) || 0;
-                } else {
-                    localPops = 0;
-                }
-                myPopsDisplay.textContent = localPops.toLocaleString();
+                localPops = doc.exists ? Number(doc.data().pops) || 0 : 0;
+                myPopsDisplay.textContent = localPops;  // 쉼표 없음
             } catch (err) {
                 console.error(`내 클릭 수 로드 에러:`, err);
             }
         }
 
         // ----------------------------------------------------
-        // 4. 클릭 처리 → 애니메이션 없이
+        // 4. 클릭 처리
         // ----------------------------------------------------
         async function handlePop() {
             if (!currentUserId) return;
             catImage.src = openImage;
             setTimeout(() => { catImage.src = closedImage; }, 80);
             localPops++;
-            myPopsDisplay.textContent = localPops.toLocaleString();
+            myPopsDisplay.textContent = localPops;  // 바로 갱신
 
             const userRef = db.collection("users").doc(currentUserId);
             try {
@@ -219,28 +207,26 @@
         });
 
         // ----------------------------------------------------
-        // 5. 애니메이션 함수 (숫자 변할 때만)
+        // 5. 숫자 애니메이션 (쉼표 없이!)
         // ----------------------------------------------------
         function updateNumberSmooth(element, newValue) {
-            const oldText = element.textContent.replace(/,/g, "") || "0";
-            const oldVal = Number(oldText) || 0;
+            const oldText = element.textContent || "0";
+            const oldVal = Number(oldText);
             if (oldVal === newValue) return;
 
-            const oldStr = oldVal.toLocaleString();
-            const newStr = newValue.toLocaleString();
+            const oldStr = oldVal.toString();
+            const newStr = newValue.toString();
             const maxLen = Math.max(oldStr.length, newStr.length);
             let html = "";
 
-            for (let i = 1; i <= maxLen; i++) {
-                const oldChar = oldStr.charAt(oldStr.length - i) || "";
-                const newChar = newStr.charAt(newStr.length - i) || "";
-                if (oldChar === newChar && oldChar !== "" && oldChar !== ",") {
-                    html = `<span class="static-text">${newChar}</span>` + html;
-                } else if (oldChar === "," || newChar === ",") {
-                    html = `<span class="static-text">,</span>` + html;
+            for (let i = 0; i < maxLen; i++) {
+                const oldChar = oldStr[oldStr.length - 1 - i] || "";
+                const newChar = newStr[newStr.length - 1 - i] || "";
+                if (oldChar === newChar && oldChar !== "") {
+                    html = `<span style="display:inline-block; width:0.6em; text-align:center;">${newChar}</span>` + html;
                 } else {
-                    const oldDisp = oldChar === "" ? "&nbsp;" : oldChar;
-                    const newDisp = newChar === "" ? "&nbsp;" : newChar;
+                    const oldDisp = oldChar === "" ? "" : oldChar;
+                    const newDisp = newChar === "" ? "" : newChar;
                     html = `
                         <span class="digit-container">
                             <span class="digit-number old">${oldDisp}</span>
@@ -255,7 +241,7 @@
             requestAnimationFrame(() => {
                 element.querySelectorAll(".digit-container").forEach(c => {
                     const old = c.querySelector(".digit-number.old");
-                    const nw  = c.querySelector(".digit-number.new");
+                    const nw = c.querySelector(".digit-number.new");
                     if (old) old.classList.add("exit");
                     if (nw) {
                         nw.classList.remove("new");
@@ -268,13 +254,14 @@
                 element.querySelectorAll(".digit-number.old").forEach(e => e.remove());
                 element.querySelectorAll(".digit-number.enter").forEach(e => {
                     e.classList.remove("enter");
-                    e.classList.add("old");
+                    e.className = "digit-number";
+                    e.style.transform = "translateY(0)";
                 });
             }, 400);
         }
 
         // ----------------------------------------------------
-        // 6. 순위표 업데이트 (이전 값에서 애니메이션 시작)
+        // 6. 순위표 업데이트
         // ----------------------------------------------------
         function updateRankList(ranks) {
             if (ranks.length === 0) {
@@ -296,7 +283,6 @@
                 if (!li) {
                     li = document.createElement('li');
                     li.id = listId;
-                    li.style.lineHeight = '1.2';
 
                     const rankIdSpan = document.createElement('span');
                     rankIdSpan.className = 'rank-id';
@@ -306,10 +292,7 @@
 
                     const popSpan = document.createElement('span');
                     popSpan.id = popSpanId;
-
-                    // 핵심: 먼저 이전 값 설정 → 그 후 애니메이션
-                    popSpan.textContent = r.pops.toLocaleString();
-                    updateNumberSmooth(popSpan, r.pops);
+                    popSpan.textContent = r.pops;
 
                     popWrapper.appendChild(popSpan);
                     li.appendChild(rankIdSpan);
@@ -322,12 +305,10 @@
                         top10List.appendChild(li);
                     }
                 } else {
-                    popSpanToUpdate = li.querySelector(`#${popSpanId}`);
+                    popSpanToUpdate = document.getElementById(popSpanId);
                 }
 
-                const rankIdSpan = li.querySelector('.rank-id');
-                rankIdSpan.textContent = `${i + 1}. ${r.id}`;
-
+                li.querySelector('.rank-id').textContent = `${i + 1}. ${r.id}`;
                 if (popSpanToUpdate) {
                     updateNumberSmooth(popSpanToUpdate, r.pops);
                 }
@@ -348,11 +329,9 @@
                     .get();
 
                 const totalSnapshot = await db.collection("users").get();
-                if (totalSnapshot && totalSnapshot.docs) {
-                    totalSnapshot.docs.forEach(doc => {
-                        totalPops += Number(doc.data().pops) || 0;
-                    });
-                }
+                totalSnapshot.docs.forEach(doc => {
+                    totalPops += Number(doc.data().pops) || 0;
+                });
 
                 updateNumberSmooth(totalPopsValue, totalPops);
                 snapshot.docs.forEach(doc => {
@@ -370,7 +349,7 @@
                 console.error("Firestore 순위 업데이트 오류:", err);
                 updateNumberSmooth(totalPopsValue, 0);
                 if (top10List.children.length === 0) {
-                    top10List.innerHTML = '<li>순위 로딩 오류 (콘솔 확인)</li>';
+                    top10List.innerHTML = '<li>순위 로딩 오류</li>';
                 }
             }
         }
