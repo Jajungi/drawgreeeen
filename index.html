@@ -156,14 +156,13 @@
         const openImage = '귀엽다2.png';
 
         // 폴링 및 활동 감지 관련 변수
-        let rankingsInterval = null; // 랭킹 읽어오는 주기 setInterval ID
-        let fastPollingTimer = null; // 5초 폴링을 20초간 유지하기 위한 setTimeout ID
+        let rankingsInterval = null; // 랭킹 읽어오는 주기
+        const FAST_POLLING_INTERVAL = 5000; // 5초
+        const SLOW_POPOLLING_INTERVAL = 30000; // 30초
+        const FAST_POLLING_DURATION_COUNT = 4; // 5초 주기로 4번 더 업데이트 (총 20초)
 
-        const FAST_POLLING_DURATION = 20000; // 5초 폴링을 20초간 유지 (5초 * 4번 업데이트)
-        const FAST_POLLING_INTERVAL = 5000; // 5초마다 랭킹 업데이트
-        const SLOW_POLLING_INTERVAL = 30000; // 30초마다 랭킹 업데이트
-
-        let isFastPollingActive = false; // 현재 5초 폴링이 활성화된 상태인지 여부
+        let fastPollingActive = false; // 현재 빠른 폴링 모드인지 여부
+        let fastPollingCounter = 0; // 빠른 폴링 남은 횟수
 
         // ----------------------------------------------------
         // 3. 게임 시작
@@ -176,8 +175,8 @@
                 startScreen.style.display = 'none';
                 gameScreen.style.display = 'block';
                 await loadMyPopsInitial();
-                // 게임 시작 시에는 30초 폴링으로 시작 (첫 클릭을 기다림)
-                setPollingInterval(SLOW_POLLING_INTERVAL);
+                // 게임 시작 시에는 느린 폴링 모드 유지, 첫 클릭을 기다림.
+                // startPolling(SLOW_POPOLLING_INTERVAL); // 이미 DOMContentLoaded에서 시작됨
             } else {
                 alert("ID를 입력해 주세요.");
             }
@@ -188,6 +187,7 @@
             try {
                 const doc = await db.collection("users").doc(currentUserId).get();
                 localPops = doc.exists ? Number(doc.data().pops) || 0 : 0;
+                // 내 클릭 수는 애니메이션 없음, 직접 textContent 업데이트
                 myPopsDisplay.textContent = localPops;
             } catch (err) {
                 console.error(`내 클릭 수 로드 에러:`, err);
@@ -195,36 +195,31 @@
         }
 
         // ----------------------------------------------------
-        // 4. 폴링 주기 제어 함수
+        // 4. 폴링 제어 함수
         // ----------------------------------------------------
-
-        // 폴링 주기를 설정하고 타이머를 다시 시작
-        function setPollingInterval(interval) {
+        function startPolling(interval) {
             if (rankingsInterval) {
                 clearInterval(rankingsInterval);
             }
-            rankingsInterval = setInterval(updateRankings, interval);
-            updateRankings(); // 타이머 시작 시 즉시 실행
-            console.log(`Polling interval set to: ${interval / 1000}s`);
+            rankingsInterval = setInterval(handlePollingTick, interval);
+            console.log(`Polling started with interval: ${interval / 1000}s`);
         }
 
-        // 5초 폴링 활성화 및 20초 타이머 시작/리셋
-        function activateFastPolling() {
-            if (!isFastPollingActive) { // 5초 폴링이 비활성화 상태일 때만 전환
-                isFastPollingActive = true;
-                setPollingInterval(FAST_POLLING_INTERVAL);
+        // 폴링 틱 핸들러
+        async function handlePollingTick() {
+            // 빠른 폴링 모드이고, 남은 횟수가 있으면 카운트 감소
+            if (fastPollingActive && fastPollingCounter > 0) {
+                fastPollingCounter--;
+                console.log(`Fast polling active. Remaining: ${fastPollingCounter}`);
+            } else if (fastPollingActive && fastPollingCounter <= 0) {
+                // 빠른 폴링 횟수 종료, 느린 폴링으로 전환
+                console.log("Fast polling finished. Switching to slow polling.");
+                fastPollingActive = false;
+                startPolling(SLOW_POPOLLING_INTERVAL);
             }
 
-            // 기존 20초 타이머가 있다면 클리어
-            if (fastPollingTimer) {
-                clearTimeout(fastPollingTimer);
-            }
-            // 20초 후 30초 폴링으로 복귀하는 타이머 설정
-            fastPollingTimer = setTimeout(() => {
-                console.log("20초 동안 5초 폴링 유지 완료. 30초 폴링으로 복귀합니다.");
-                isFastPollingActive = false;
-                setPollingInterval(SLOW_POLLING_INTERVAL);
-            }, FAST_POLLING_DURATION);
+            // 실제 순위 업데이트 실행
+            await updateRankings();
         }
 
         // ----------------------------------------------------
@@ -251,19 +246,16 @@
                 console.error("클릭 업데이트 실패:", error);
             }
 
-            // 첫 클릭이거나 30초 폴링 상태일 때 5초 폴링 활성화
-            // 5초 폴링 중에는 추가 클릭이 주기를 리셋하지 않음 (요구사항)
-            if (!isFastPollingActive) {
-                activateFastPolling();
-            } else {
-                // 5초 폴링 활성화 상태에서는 20초 타이머만 리셋 (즉, 5초 폴링 유지 기간 연장)
-                // 하지만 요구사항에 "다음 클릭은 무시하고 (클릭 수는 계속 올라가야 함) 5초동안 4번, 즉 20초동안 5초 주기로 업데이크 되고, 다시 30초로 바뀌면서 그 이후 첫 클릭을 기다리는거야" 라고 하셨으므로,
-                // 여기서는 20초 타이머도 리셋하지 않고 그대로 두는 것이 요구사항에 맞습니다.
-                // 즉, 20초 동안 추가 클릭이 발생하더라도 20초 타이머는 그대로 진행되어 20초가 지나면 30초로 전환됩니다.
+            // 첫 클릭이거나 빠른 폴링 모드가 아닐 때만 빠른 폴링 시작
+            if (!fastPollingActive) {
+                console.log("First click detected! Starting fast polling.");
+                fastPollingActive = true;
+                fastPollingCounter = FAST_POLLING_DURATION_COUNT; // 4번 더 실행
+                startPolling(FAST_POLLING_INTERVAL); // 5초 주기로 즉시 전환
             }
-            
-            // 즉시 순위 갱신 (더 빠른 반영)
-            //updateRankings();
+
+            // 클릭 발생 시 즉시 순위 갱신 (더 빠른 반영)
+            updateRankings();
         }
 
         catImage.addEventListener('mousedown', handlePop);
@@ -363,7 +355,7 @@
 
                     const popSpan = document.createElement('span');
                     popSpan.id = popSpanId;
-                    popSpan.textContent = r.pops;
+                    popSpan.textContent = r.pops; // 초기값 설정
 
                     popWrapper.appendChild(popSpan);
                     li.appendChild(rankIdSpan);
@@ -387,9 +379,9 @@
         }
 
         // ----------------------------------------------------
-        // 8. 순위 및 전체 클릭 수 업데이트 (동적 주기)
+        // 8. 순위 및 전체 클릭 수 업데이트 (애니메이션 포함)
         // ----------------------------------------------------
-        async function updateRankings() {
+        async function updateRankings(initialLoad = false) { // initialLoad 플래그 추가
             let totalPops = 0;
             const ranks = [];
 
@@ -404,7 +396,16 @@
                     totalPops += Number(doc.data().pops) || 0;
                 });
 
-                updateNumberSmooth(totalPopsValue, totalPops);
+                // 초기 로드 시 0부터 애니메이션, 그 외에는 현재 값부터 애니메이션
+                if (initialLoad) {
+                    // 처음 로드할 때는 current value가 '로딩 중...' 이므로, 0부터 시작하도록 강제
+                    totalPopsValue.textContent = '0';
+                    updateNumberSmooth(totalPopsValue, totalPops);
+                } else {
+                    updateNumberSmooth(totalPopsValue, totalPops);
+                }
+                
+                // 순위표는 항상 현재 값부터 애니메이션
                 snapshot.docs.forEach(doc => {
                     ranks.push({ id: doc.id, pops: Number(doc.data().pops) || 0 });
                 });
@@ -412,7 +413,13 @@
 
             } catch (err) {
                 console.error("Firestore 오류:", err);
-                updateNumberSmooth(totalPopsValue, 0);
+                // 오류 발생 시에도 0부터 애니메이션 (또는 현재 값부터)
+                if (initialLoad) {
+                    totalPopsValue.textContent = '0';
+                    updateNumberSmooth(totalPopsValue, 0);
+                } else {
+                    updateNumberSmooth(totalPopsValue, 0);
+                }
                 if (top10List.children.length === 0) {
                     top10List.innerHTML = '<li>로딩 오류</li>';
                 }
@@ -422,9 +429,10 @@
         // ----------------------------------------------------
         // 9. 초기 실행: 페이지 로드 시 바로 순위 업데이트 시작
         // ----------------------------------------------------
-        document.addEventListener('DOMContentLoaded', () => {
-            // 초기에는 30초 주기로 폴링 시작 (첫 클릭을 기다림)
-            setPollingInterval(SLOW_POLLING_INTERVAL);
+        document.addEventListener('DOMContentLoaded', async () => {
+            // ID 입력 화면에서 랭킹을 가져올 때 애니메이션 적용
+            await updateRankings(true); // initialLoad 플래그를 true로 설정
+            startPolling(SLOW_POPOLLING_INTERVAL); // 30초 주기로 폴링 시작
         });
     </script>
 </body>
