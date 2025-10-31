@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>멀티플레이 초록그림 (자릿수 애니메이션 최종)</title>
+    <title>멀티플레이 초록그림 (애니메이션 완벽 수정)</title>
     <style>
         body {
             display: flex;
@@ -17,7 +17,6 @@
             position: relative;
         }
 
-        /* ------------------------------------------- */
         .digit-container {
             position: relative;
             overflow: hidden;
@@ -28,16 +27,14 @@
             margin: 0;
             padding: 0;
             text-align: center;
-            width: 0.6em;           /* 숫자 간격 고정 */
+            width: 0.6em;
             box-sizing: border-box;
         }
 
         .digit-number {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -57,76 +54,35 @@
             min-width: 0.35em;
         }
 
-        /* ------------------------------------------- */
         #ranking-section {
             position: absolute;
-            top: 15px;
-            left: 15px;
+            top: 15px; left: 15px;
             background-color: white;
             padding: 15px;
             border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             min-width: 250px;
         }
         #total-pops-display {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
+            font-size: 1.5em; font-weight: bold; color: #333;
+            margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;
         }
-        #top-10-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            font-size: 0.95em;
-        }
-        #top-10-list li {
-            margin: 4px 0;
-            display: flex;
-            justify-content: space-between;
-            line-height: 1.2;
-        }
-        #top-10-list .rank-id {
-            font-weight: bold;
-        }
-        .rank-pops {
-            display: flex;
-            text-align: right;
-            color: #007bff;
-            justify-content: flex-end;
-            min-width: 100px;
-            line-height: 1.2;
-        }
+        #top-10-list { list-style: none; padding: 0; margin: 0; font-size: 0.95em; }
+        #top-10-list li { margin: 4px 0; display: flex; justify-content: space-between; line-height: 1.2; }
+        #top-10-list .rank-id { font-weight: bold; }
+        .rank-pops { display: flex; text-align: right; color: #007bff; justify-content: flex-end; min-width: 100px; line-height: 1.2; }
+
         #start-screen { display: flex; flex-direction: column; align-items: center; }
         #game-screen { display: none; text-align: center; }
-        #my-pops-display-wrapper {
-            font-size: 3.5em;
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #d9534f;
-            display: block;
-            line-height: 1.2;
-        }
-        #my-pops-display {
-            line-height: 1.2;
-            display: inline-block;
-        }
-        #popcat-image {
-            width: 300px;
-            height: auto;
-            cursor: pointer;
-            transition: transform 0.05s ease;
-        }
+        #my-pops-display-wrapper { font-size: 3.5em; font-weight: bold; margin-bottom: 10px; color: #d9534f; display: block; line-height: 1.2; }
+        #my-pops-display { line-height: 1.2; display: inline-block; }
+
+        #popcat-image { width: 300px; height: auto; cursor: pointer; transition: transform 0.05s ease; }
         #popcat-image:active { transform: scale(0.98); }
+
         input, button {
-            padding: 12px 20px;
-            font-size: 1.1em;
-            margin-top: 15px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            cursor: pointer;
+            padding: 12px 20px; font-size: 1.1em; margin-top: 15px;
+            border-radius: 8px; border: 1px solid #ccc; cursor: pointer;
         }
     </style>
 
@@ -173,12 +129,11 @@
             messagingSenderId: "1050500469107",
             appId: "1:1050500469107:web:6c25e893e7c12500f23506"
         };
-
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
         // ----------------------------------------------------
-        // 2. DOM 요소 및 변수
+        // 2. DOM 및 변수
         // ----------------------------------------------------
         const catImage = document.getElementById('popcat-image');
         const myPopsDisplay = document.getElementById('my-pops-display');
@@ -220,25 +175,24 @@
                 const doc = await db.collection("users").doc(currentUserId).get();
                 if (doc.exists) {
                     localPops = Number(doc.data().pops) || 0;
-                    updateNumberSmooth(myPopsDisplay, localPops);
                 } else {
                     localPops = 0;
-                    updateNumberSmooth(myPopsDisplay, 0);
                 }
+                myPopsDisplay.textContent = localPops.toLocaleString();
             } catch (err) {
                 console.error(`내 클릭 수 로드 에러:`, err);
             }
         }
 
         // ----------------------------------------------------
-        // 4. 클릭 처리
+        // 4. 클릭 처리 → 애니메이션 없이
         // ----------------------------------------------------
         async function handlePop() {
             if (!currentUserId) return;
             catImage.src = openImage;
             setTimeout(() => { catImage.src = closedImage; }, 80);
             localPops++;
-            updateNumberSmooth(myPopsDisplay, localPops);
+            myPopsDisplay.textContent = localPops.toLocaleString();
 
             const userRef = db.collection("users").doc(currentUserId);
             try {
@@ -249,7 +203,6 @@
                 console.error("클릭 카운트 업데이트 실패:", error);
             }
 
-            // 클릭 시 5초 폴링 복귀
             lastClickTime = Date.now();
             if (currentPollingInterval !== 5000) {
                 clearInterval(rankingsInterval);
@@ -266,7 +219,7 @@
         });
 
         // ----------------------------------------------------
-        // 5. 자릿수 애니메이션 (숫자 변하지 않으면 스킵)
+        // 5. 애니메이션 함수 (숫자 변할 때만)
         // ----------------------------------------------------
         function updateNumberSmooth(element, newValue) {
             const oldText = element.textContent.replace(/,/g, "") || "0";
@@ -276,8 +229,8 @@
             const oldStr = oldVal.toLocaleString();
             const newStr = newValue.toLocaleString();
             const maxLen = Math.max(oldStr.length, newStr.length);
-
             let html = "";
+
             for (let i = 1; i <= maxLen; i++) {
                 const oldChar = oldStr.charAt(oldStr.length - i) || "";
                 const newChar = newStr.charAt(newStr.length - i) || "";
@@ -321,7 +274,7 @@
         }
 
         // ----------------------------------------------------
-        // 6. 순위표 업데이트 (처음 생성 시에도 애니메이션)
+        // 6. 순위표 업데이트 (이전 값에서 애니메이션 시작)
         // ----------------------------------------------------
         function updateRankList(ranks) {
             if (ranks.length === 0) {
@@ -354,7 +307,9 @@
                     const popSpan = document.createElement('span');
                     popSpan.id = popSpanId;
 
-                    updateNumberSmooth(popSpan, r.pops);  // 처음 생성 시 애니메이션
+                    // 핵심: 먼저 이전 값 설정 → 그 후 애니메이션
+                    popSpan.textContent = r.pops.toLocaleString();
+                    updateNumberSmooth(popSpan, r.pops);
 
                     popWrapper.appendChild(popSpan);
                     li.appendChild(rankIdSpan);
@@ -380,7 +335,7 @@
         }
 
         // ----------------------------------------------------
-        // 7. 순위 및 합계 업데이트 (20초 무클릭 → 1분 폴링)
+        // 7. 순위 및 전체 클릭 수 업데이트
         // ----------------------------------------------------
         async function updateRankings() {
             let totalPops = 0;
@@ -400,13 +355,11 @@
                 }
 
                 updateNumberSmooth(totalPopsValue, totalPops);
-
                 snapshot.docs.forEach(doc => {
                     ranks.push({ id: doc.id, pops: Number(doc.data().pops) || 0 });
                 });
                 updateRankList(ranks);
 
-                // 20초 이상 클릭 없으면 1분 폴링
                 if (Date.now() - lastClickTime > 20000 && currentPollingInterval !== 60000) {
                     clearInterval(rankingsInterval);
                     currentPollingInterval = 60000;
@@ -423,15 +376,17 @@
         }
 
         // ----------------------------------------------------
-        // 8. 시작 로직
+        // 8. 시작
         // ----------------------------------------------------
         updateRankings();
         rankingsInterval = setInterval(updateRankings, 5000);
 
         document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => updateNumberSmooth(totalPopsValue, 0), 50);
+            setTimeout(() => {
+                totalPopsValue.textContent = "0";
+                updateNumberSmooth(totalPopsValue, 0);
+            }, 50);
         });
     </script>
 </body>
 </html>
-
