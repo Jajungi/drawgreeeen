@@ -166,7 +166,8 @@
                 const doc = await db.collection("users").doc(currentUserId).get();
                 localPops = doc.exists ? Number(doc.data().pops) || 0 : 0;
                 myPopsDisplay.textContent = localPops;
-                myPopsDisplay.dataset.currentValue = localPops; // 초기값 설정
+                // '내 클릭 수'는 애니메이션을 사용하지 않으므로 dataset.currentValue는 단순 동기화용.
+                myPopsDisplay.dataset.currentValue = localPops; 
             } catch (err) {
                 console.error("내 클릭 수 로드 에러:", err);
             }
@@ -212,7 +213,15 @@
         // ----------------- 숫자 애니메이션 -----------------
         function updateNumberSmooth(element, newValue) {
             // dataset.currentValue를 사용하여 현재 엘리먼트가 표시하고 있는 논리적 값을 가져온다.
+            // 애니메이션 도중 textContent가 불안정할 수 있으므로 항상 dataset을 기준으로 한다.
             const oldVal = Number(element.dataset.currentValue || "0");
+            
+            // 만약 이전 값이 NaN이거나 유효하지 않으면 0으로 처리 (안정성 강화)
+            if (isNaN(oldVal)) {
+                console.warn("updateNumberSmooth: oldVal이 NaN입니다. 0으로 초기화합니다.");
+                oldVal = 0;
+            }
+
             if (oldVal === newValue) return;
 
             const oldStr = oldVal.toString();
@@ -224,7 +233,6 @@
                 const oldChar = oldStr[oldStr.length - 1 - i] || " ";
                 const newChar = newStr[newStr.length - 1 - i] || " ";
                 
-                // 새로운 숫자를 포함하는 컨테이너를 생성하여 일관된 DOM 구조를 유지
                 if (oldChar === newChar) {
                     html = `<span class="digit-container"><span class="digit-number">${newChar}</span></span>` + html;
                 } else {
@@ -244,7 +252,8 @@
                 });
             });
 
-            // 애니메이션 완료 후 최종 값을 data-current-value와 textContent에 반영
+            // 애니메이션 완료 후 최종 값을 data-current-value에 반영하고,
+            // textContent도 최종 숫자 값만 포함하도록 정리한다.
             setTimeout(() => {
                 element.querySelectorAll(".digit-number.old.exit").forEach(e => e.remove());
                 element.querySelectorAll(".digit-number.enter").forEach(e => {
@@ -254,7 +263,7 @@
                 });
                 element.textContent = newValue; // 애니메이션 완료 후 최종 값으로 설정
                 element.dataset.currentValue = newValue; // 데이터 속성도 업데이트
-            }, 400);
+            }, 400); // CSS transition duration과 일치해야 함
         }
 
         // ----------------- 순위표 -----------------
@@ -292,8 +301,9 @@
                     } else {
                         top10List.appendChild(li);
                     }
-                    popSpanElement.textContent = '0'; // 초기값 설정 (애니메이션이 시작될 기준점)
-                    popSpanElement.dataset.currentValue = '0'; // data 속성 초기화
+                    // 새로 생성된 요소의 초기 값을 설정 (dataset과 textContent 모두)
+                    popSpanElement.textContent = '0'; 
+                    popSpanElement.dataset.currentValue = '0';
                 } else {
                     popSpanElement = document.getElementById(popSpanId);
                 }
