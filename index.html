@@ -165,8 +165,8 @@
             try {
                 const doc = await db.collection("users").doc(currentUserId).get();
                 localPops = doc.exists ? Number(doc.data().pops) || 0 : 0;
-                // '내 클릭 수'는 애니메이션 없이 직접 텍스트로 설정
                 myPopsDisplay.textContent = localPops;
+                myPopsDisplay.dataset.currentValue = localPops; // 초기값 설정
             } catch (err) {
                 console.error("내 클릭 수 로드 에러:", err);
             }
@@ -188,8 +188,8 @@
             setTimeout(() => catImage.src = closedImage, 80);
 
             localPops++;
-            // '내 클릭 수'는 애니메이션 없이 직접 텍스트로 설정
-            myPopsDisplay.textContent = localPops;
+            myPopsDisplay.textContent = localPops; // 내 클릭수는 애니메이션 없이 직접 업데이트
+            myPopsDisplay.dataset.currentValue = localPops; // 데이터 속성에도 업데이트
 
             try {
                 await db.collection("users").doc(currentUserId).set({
@@ -209,17 +209,10 @@
             console.log(`Polling started: interval=${interval}ms`);
         }
 
-        // ----------------- 숫자 애니메이션 (순위표 및 전체 클릭 수에만 사용) -----------------
+        // ----------------- 숫자 애니메이션 -----------------
         function updateNumberSmooth(element, newValue) {
-            // '내 클릭 수' 요소가 아니며, .digit-container가 이미 존재하는 경우에만 애니메이션을 적용.
-            // myPopsDisplay는 애니메이션을 적용하지 않으므로 이 조건에 걸리지 않게 됨.
-            if (element === myPopsDisplay) {
-                element.textContent = newValue; // myPopsDisplay는 애니메이션 없이 직접 업데이트
-                return;
-            }
-
-            const oldText = element.textContent.replace(/[^0-9]/g, '') || "0";
-            const oldVal = Number(oldText);
+            // dataset.currentValue를 사용하여 현재 엘리먼트가 표시하고 있는 논리적 값을 가져온다.
+            const oldVal = Number(element.dataset.currentValue || "0");
             if (oldVal === newValue) return;
 
             const oldStr = oldVal.toString();
@@ -230,26 +223,14 @@
             for (let i = 0; i < maxLen; i++) {
                 const oldChar = oldStr[oldStr.length - 1 - i] || " ";
                 const newChar = newStr[newStr.length - 1 - i] || " ";
-                // oldChar가 공백이고 newChar도 공백이면 건너뛰어 불필요한 빈 digit-container를 만들지 않음
-                if (oldChar === " " && newChar === " ") continue;
-
+                
+                // 새로운 숫자를 포함하는 컨테이너를 생성하여 일관된 DOM 구조를 유지
                 if (oldChar === newChar) {
                     html = `<span class="digit-container"><span class="digit-number">${newChar}</span></span>` + html;
                 } else {
                     html = `<span class="digit-container"><span class="digit-number old">${oldChar}</span><span class="digit-number new">${newChar}</span></span>` + html;
                 }
             }
-
-            // HTML이 비어있다면, 즉 숫자가 없거나 모두 공백이면 초기화
-            if (html === "" && newValue === 0) {
-                 element.innerHTML = '0'; // 0으로 명확히 표시
-                 return;
-            } else if (html === "" && newValue > 0) {
-                 // 숫자가 있는데 HTML이 비어있다면 (예: 0 -> 10000 처럼 자릿수 급변 시)
-                 element.textContent = newValue; // 직접 업데이트
-                 return;
-            }
-
 
             element.innerHTML = html;
             void element.offsetHeight; // reflow
@@ -263,7 +244,7 @@
                 });
             });
 
-            // 애니메이션 완료 후 불필요한 DOM 요소 정리
+            // 애니메이션 완료 후 최종 값을 data-current-value와 textContent에 반영
             setTimeout(() => {
                 element.querySelectorAll(".digit-number.old.exit").forEach(e => e.remove());
                 element.querySelectorAll(".digit-number.enter").forEach(e => {
@@ -271,22 +252,20 @@
                     e.className = "digit-number";
                     e.style.transform = "translateY(0)";
                 });
-                // 최종적으로 DOM이 깔끔하게 하나의 .digit-number만 남도록 정리
-                // 이 부분이 이전에 누적된 버그의 원인일 수 있음
-                // 여기서는 직접 텍스트를 최종 값으로 설정하여 일관성을 확보합니다.
-                // 그러나 애니메이션이 끝나기 전에 다음 업데이트가 오면 다시 혼란이 발생할 수 있으므로
-                // updateRankList에서 .rank-pops의 구조를 직접 관리하는 것이 더 안정적입니다.
+                element.textContent = newValue; // 애니메이션 완료 후 최종 값으로 설정
+                element.dataset.currentValue = newValue; // 데이터 속성도 업데이트
             }, 400);
         }
 
         // ----------------- 순위표 -----------------
         function updateRankList(ranks) {
             if (!ranks.length) { top10List.innerHTML = '<li>아직 데이터가 없습니다.</li>'; return; }
-            const currentRankIds = new Set(ranks.map(r => `rank-${r.id}`));
             
-            // 기존에 없는 순위 항목 제거
-            Array.from(top10List.children).forEach(li => { 
-                if (!currentRankIds.has(li.id)) {
+            // 기존에 없는 랭크 제거
+            const existingRankIds = new Set(Array.from(top10List.children).map(li => li.id));
+            const newRankIds = new Set(ranks.map(r => `rank-${r.id}`));
+            Array.from(top10List.children).forEach(li => {
+                if (!newRankIds.has(li.id)) {
                     li.remove();
                 }
             });
@@ -298,43 +277,32 @@
                 let popSpanElement = null;
 
                 if (!li) {
-                    // 새로운 li 요소 생성
-                    li = document.createElement('li');
-                    li.id = listId;
-
-                    const rankIdSpan = document.createElement('span');
-                    rankIdSpan.className = 'rank-id';
-                    rankIdSpan.textContent = `${i + 1}. ${r.id}`; // ID는 바로 설정
-
-                    const popWrapper = document.createElement('span');
-                    popWrapper.className = 'rank-pops';
-
-                    popSpanElement = document.createElement('span');
-                    popSpanElement.id = popSpanId;
-                    popWrapper.appendChild(popSpanElement); // 빈 span을 추가
-
+                    li = document.createElement('li'); li.id = listId;
+                    const rankIdSpan = document.createElement('span'); rankIdSpan.className = 'rank-id';
+                    const popWrapper = document.createElement('span'); popWrapper.className = 'rank-pops';
+                    popSpanElement = document.createElement('span'); popSpanElement.id = popSpanId;
+                    popWrapper.appendChild(popSpanElement);
                     li.appendChild(rankIdSpan);
                     li.appendChild(popWrapper);
 
-                    // 적절한 위치에 삽입
+                    // 새로운 요소 삽입 위치 결정
                     const existing = Array.from(top10List.children);
                     if (i < existing.length) {
                         top10List.insertBefore(li, existing[i]);
                     } else {
                         top10List.appendChild(li);
                     }
+                    popSpanElement.textContent = '0'; // 초기값 설정 (애니메이션이 시작될 기준점)
+                    popSpanElement.dataset.currentValue = '0'; // data 속성 초기화
                 } else {
-                    // 기존 li 요소인 경우
                     popSpanElement = document.getElementById(popSpanId);
-                    li.querySelector('.rank-id').textContent = `${i + 1}. ${r.id}`; // 랭크만 업데이트
                 }
-                
-                // 항상 updateNumberSmooth를 통해 팝 수를 업데이트.
-                // 이때 popSpanElement의 초기 content는 updateNumberSmooth 내부에서 처리됨.
+
+                li.querySelector('.rank-id').textContent = `${i + 1}. ${r.id}`;
+                // 항상 updateNumberSmooth를 통해 값을 업데이트
                 updateNumberSmooth(popSpanElement, r.pops);
             });
         }
-
 
         // ----------------- 순위 및 전체 클릭 수 -----------------
         async function updateRankings(initialLoad = false) {
@@ -344,23 +312,31 @@
                 const totalSnapshot = await db.collection("users").get();
                 totalSnapshot.docs.forEach(doc => { totalPops += Number(doc.data().pops) || 0; });
 
-                // 전체 클릭 수 업데이트 (애니메이션 적용)
-                updateNumberSmooth(totalPopsValue, totalPops);
+                if (initialLoad) {
+                    totalPopsValue.textContent = '0';
+                    totalPopsValue.dataset.currentValue = '0'; // 초기값 설정
+                    updateNumberSmooth(totalPopsValue, totalPops);
+                } else {
+                    updateNumberSmooth(totalPopsValue, totalPops);
+                }
 
                 snapshot.docs.forEach(doc => { ranks.push({ id: doc.id, pops: Number(doc.data().pops) || 0 }); });
                 updateRankList(ranks);
             } catch (err) {
                 console.error("Firestore 오류:", err);
-                // 오류 발생 시에도 0으로 업데이트 (애니메이션 적용)
-                updateNumberSmooth(totalPopsValue, 0);
+                if (initialLoad) {
+                    totalPopsValue.textContent = '0';
+                    totalPopsValue.dataset.currentValue = '0'; // 초기값 설정
+                    updateNumberSmooth(totalPopsValue, 0);
+                } else {
+                    updateNumberSmooth(totalPopsValue, 0);
+                }
                 if (!top10List.children.length) top10List.innerHTML = '<li>로딩 오류</li>';
             }
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            // 초기 로드 시 updateRankings를 통해 전체 클릭 수와 순위표를 한 번 업데이트
             await updateRankings(true);
-            // 이후 폴링 시작
             startPolling(POLLING_INTERVAL); // 항상 8초 폴링 시작
         });
     </script>
