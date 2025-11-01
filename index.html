@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -76,8 +77,16 @@
             line-height: 1.2;
         }
         #my-pops-display { line-height: 1.2; }
-        #popcat-image { width: 300px; height: auto; cursor: pointer; transition: transform 0.05s ease; }
-        #popcat-image:active { transform: scale(0.98); }
+        /* 기존 이미지 스타일 제거하고 캔버스 스타일 추가 */
+        #popcat-canvas {
+            width: 300px; /* 이미지와 동일한 크기로 설정 */
+            height: auto;
+            cursor: pointer;
+            border: 2px solid transparent; /* 테두리 추가 (선택 사항) */
+            box-sizing: border-box; /* 패딩, 보더가 width에 포함되도록 */
+        }
+        /* 캔버스에 active 스타일을 주기 어렵지만, 필요하다면 CSS로 다른 효과를 고려 */
+        /* #popcat-canvas:active { transform: scale(0.98); } */ 
         input, button {
             padding: 12px 20px; font-size: 1.1em; margin-top: 15px;
             border-radius: 8px; border: 1px solid #ccc; cursor: pointer;
@@ -109,7 +118,8 @@
         <div id="my-pops-display-wrapper">
             <span id="my-pops-display">0</span>
         </div>
-        <img id="popcat-image" src="귀엽다.png" alt="팝캣">
+        <!-- 팝캣 이미지를 Canvas로 대체 -->
+        <canvas id="popcat-canvas" width="300" height="300"></canvas> 
         <div class="instruction" style="color:#444; margin-top: 10px;">당신의 ID: <strong id="current-user-id"></strong></div>
     </div>
 
@@ -127,7 +137,10 @@
         const db = firebase.firestore();
 
         // DOM 변수
-        const catImage = document.getElementById('popcat-image');
+        // const catImage = document.getElementById('popcat-image'); // 이제 사용하지 않음
+        const popcatCanvas = document.getElementById('popcat-canvas');
+        const ctx = popcatCanvas.getContext('2d'); // Canvas Context 가져오기
+
         const myPopsDisplay = document.getElementById('my-pops-display');
         const totalPopsValue = document.getElementById('total-pops-value');
         const top10List = document.getElementById('top-10-list');
@@ -139,12 +152,29 @@
 
         let currentUserId = null;
         let localPops = 0;
-        const closedImage = '귀엽다.png';
-        const openImage = '귀엽다2.png';
+        const closedImageSrc = '귀엽다.png'; // 기본 이미지 (캔버스에 그릴 이미지)
+        
+        let originalImage = new Image(); // 원본 이미지를 로드할 Image 객체
+        let originalImageData = null; // 원본 이미지의 픽셀 데이터
+
+        // Canvas 이미지 로드 및 초기화
+        originalImage.src = closedImageSrc;
+        originalImage.onload = () => {
+            // 이미지 로드 완료 후 캔버스 크기를 이미지에 맞게 조정
+            popcatCanvas.width = originalImage.width;
+            popcatCanvas.height = originalImage.height;
+            drawOriginalImage(); // Canvas에 초기 이미지 그리기
+        };
+
+        function drawOriginalImage() {
+            ctx.clearRect(0, 0, popcatCanvas.width, popcatCanvas.height); // 캔버스 지우기
+            ctx.drawImage(originalImage, 0, 0, popcatCanvas.width, popcatCanvas.height); // 이미지 그리기
+            // 원본 픽셀 데이터 저장
+            originalImageData = ctx.getImageData(0, 0, popcatCanvas.width, popcatCanvas.height);
+        }
 
         // 폴링 관련
         let rankingsInterval = null;
-        // 항상 8초 대기로 고정
         const POLLING_INTERVAL = 8000; // 8초
 
         // ----------------- 게임 시작 -----------------
@@ -166,31 +196,38 @@
                 const doc = await db.collection("users").doc(currentUserId).get();
                 localPops = doc.exists ? Number(doc.data().pops) || 0 : 0;
                 myPopsDisplay.textContent = localPops;
-                // '내 클릭 수'는 애니메이션을 사용하지 않으므로 dataset.currentValue는 단순 동기화용.
                 myPopsDisplay.dataset.currentValue = localPops; 
             } catch (err) {
                 console.error("내 클릭 수 로드 에러:", err);
             }
         }
 
-        // ----------------- 클릭 처리 -----------------
-        catImage.addEventListener('mousedown', handlePop);
+        // ----------------- 클릭 처리 (캔버스 클릭 이벤트로 변경) -----------------
+        popcatCanvas.addEventListener('mousedown', handlePop);
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && !e.repeat && currentUserId) {
                 e.preventDefault();
-                handlePop();
+                // 스페이스바는 캔버스 중앙을 클릭한 것으로 간주
+                const centerX = popcatCanvas.width / 2;
+                const centerY = popcatCanvas.height / 2;
+                handlePop({ offsetX: centerX, offsetY: centerY });
             }
         });
 
-        async function handlePop() {
-            if (!currentUserId) return;
-
-            catImage.src = openImage;
-            setTimeout(() => catImage.src = closedImage, 80);
+        async function handlePop(event) {
+            if (!currentUserId || !originalImageData) return; // 이미지 데이터가 없으면 실행 안함
 
             localPops++;
-            myPopsDisplay.textContent = localPops; // 내 클릭수는 애니메이션 없이 직접 업데이트
-            myPopsDisplay.dataset.currentValue = localPops; // 데이터 속성에도 업데이트
+            myPopsDisplay.textContent = localPops; 
+            myPopsDisplay.dataset.currentValue = localPops; 
+
+            // 픽셀 밀어내기 효과 적용
+            applyDisplacementEffect(event.offsetX, event.offsetY);
+
+            // 잠시 후 원래 이미지로 복구
+            setTimeout(() => {
+                drawOriginalImage();
+            }, 120); // 픽셀 밀림 효과가 보이는 시간 (조정 가능)
 
             try {
                 await db.collection("users").doc(currentUserId).set({
@@ -198,6 +235,59 @@
                 }, { merge: true });
             } catch (err) { console.error("클릭 업데이트 실패:", err); }
         }
+
+        // ----------------- 픽셀 밀어내기 효과 함수 -----------------
+        function applyDisplacementEffect(centerX, centerY) {
+            const imageData = ctx.createImageData(popcatCanvas.width, popcatCanvas.height);
+            const data = imageData.data;
+            const originalData = originalImageData.data;
+            const width = popcatCanvas.width;
+            const height = popcatCanvas.height;
+
+            const effectRadius = 30; // 픽셀 밀림 효과 반경 (조정 가능)
+            const displacementStrength = 10; // 픽셀이 밀려나는 강도 (조정 가능)
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const dist = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+
+                    if (dist < effectRadius) {
+                        // 클릭 지점에서 멀어질수록 강도가 약해지도록
+                        const strength = displacementStrength * (1 - dist / effectRadius);
+
+                        // 픽셀을 바깥쪽으로 밀어내는 벡터 계산
+                        const angle = Math.atan2(y - centerY, x - centerX);
+                        const newX = x + Math.cos(angle) * strength;
+                        const newY = y + Math.sin(angle) * strength;
+
+                        // 원래 이미지에서 새로운 좌표의 픽셀을 가져옴 (범위 벗어나면 검은색 등 처리)
+                        const originalPixelIndex = (Math.floor(newY) * width + Math.floor(newX)) * 4;
+
+                        const targetIndex = (y * width + x) * 4;
+
+                        if (originalPixelIndex >= 0 && originalPixelIndex < originalData.length) {
+                            data[targetIndex] = originalData[originalPixelIndex];     // R
+                            data[targetIndex + 1] = originalData[originalPixelIndex + 1]; // G
+                            data[targetIndex + 2] = originalData[originalPixelIndex + 2]; // B
+                            data[targetIndex + 3] = originalData[originalPixelIndex + 3]; // A
+                        } else {
+                            // 범위 밖은 투명하게 처리 (구멍이 뚫린 것처럼 보이게)
+                            data[targetIndex + 3] = 0; 
+                        }
+                    } else {
+                        // 효과 반경 밖의 픽셀은 원본 그대로 유지
+                        const originalPixelIndex = (y * width + x) * 4;
+                        const targetIndex = (y * width + x) * 4;
+                        data[targetIndex] = originalData[originalPixelIndex];
+                        data[targetIndex + 1] = originalData[originalPixelIndex + 1];
+                        data[targetIndex + 2] = originalData[originalPixelIndex + 2];
+                        data[targetIndex + 3] = originalData[originalPixelIndex + 3];
+                    }
+                }
+            }
+            ctx.putImageData(imageData, 0, 0); // 수정된 픽셀 데이터를 Canvas에 그리기
+        }
+
 
         // ----------------- 폴링 제어 -----------------
         function startPolling(interval) {
@@ -212,11 +302,8 @@
 
         // ----------------- 숫자 애니메이션 -----------------
         function updateNumberSmooth(element, newValue) {
-            // dataset.currentValue를 사용하여 현재 엘리먼트가 표시하고 있는 논리적 값을 가져온다.
-            // 애니메이션 도중 textContent가 불안정할 수 있으므로 항상 dataset을 기준으로 한다.
             const oldVal = Number(element.dataset.currentValue || "0");
             
-            // 만약 이전 값이 NaN이거나 유효하지 않으면 0으로 처리 (안정성 강화)
             if (isNaN(oldVal)) {
                 console.warn("updateNumberSmooth: oldVal이 NaN입니다. 0으로 초기화합니다.");
                 oldVal = 0;
@@ -252,8 +339,6 @@
                 });
             });
 
-            // 애니메이션 완료 후 최종 값을 data-current-value에 반영하고,
-            // textContent도 최종 숫자 값만 포함하도록 정리한다.
             setTimeout(() => {
                 element.querySelectorAll(".digit-number.old.exit").forEach(e => e.remove());
                 element.querySelectorAll(".digit-number.enter").forEach(e => {
@@ -261,16 +346,15 @@
                     e.className = "digit-number";
                     e.style.transform = "translateY(0)";
                 });
-                element.textContent = newValue; // 애니메이션 완료 후 최종 값으로 설정
-                element.dataset.currentValue = newValue; // 데이터 속성도 업데이트
-            }, 400); // CSS transition duration과 일치해야 함
+                element.textContent = newValue; 
+                element.dataset.currentValue = newValue; 
+            }, 400); 
         }
 
         // ----------------- 순위표 -----------------
         function updateRankList(ranks) {
             if (!ranks.length) { top10List.innerHTML = '<li>아직 데이터가 없습니다.</li>'; return; }
             
-            // 기존에 없는 랭크 제거
             const existingRankIds = new Set(Array.from(top10List.children).map(li => li.id));
             const newRankIds = new Set(ranks.map(r => `rank-${r.id}`));
             Array.from(top10List.children).forEach(li => {
@@ -294,14 +378,12 @@
                     li.appendChild(rankIdSpan);
                     li.appendChild(popWrapper);
 
-                    // 새로운 요소 삽입 위치 결정
                     const existing = Array.from(top10List.children);
                     if (i < existing.length) {
                         top10List.insertBefore(li, existing[i]);
                     } else {
                         top10List.appendChild(li);
                     }
-                    // 새로 생성된 요소의 초기 값을 설정 (dataset과 textContent 모두)
                     popSpanElement.textContent = '0'; 
                     popSpanElement.dataset.currentValue = '0';
                 } else {
@@ -309,7 +391,6 @@
                 }
 
                 li.querySelector('.rank-id').textContent = `${i + 1}. ${r.id}`;
-                // 항상 updateNumberSmooth를 통해 값을 업데이트
                 updateNumberSmooth(popSpanElement, r.pops);
             });
         }
@@ -324,7 +405,7 @@
 
                 if (initialLoad) {
                     totalPopsValue.textContent = '0';
-                    totalPopsValue.dataset.currentValue = '0'; // 초기값 설정
+                    totalPopsValue.dataset.currentValue = '0'; 
                     updateNumberSmooth(totalPopsValue, totalPops);
                 } else {
                     updateNumberSmooth(totalPopsValue, totalPops);
@@ -336,7 +417,7 @@
                 console.error("Firestore 오류:", err);
                 if (initialLoad) {
                     totalPopsValue.textContent = '0';
-                    totalPopsValue.dataset.currentValue = '0'; // 초기값 설정
+                    totalPopsValue.dataset.currentValue = '0'; 
                     updateNumberSmooth(totalPopsValue, 0);
                 } else {
                     updateNumberSmooth(totalPopsValue, 0);
@@ -347,7 +428,7 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             await updateRankings(true);
-            startPolling(POLLING_INTERVAL); // 항상 8초 폴링 시작
+            startPolling(POLLING_INTERVAL); 
         });
     </script>
 </body>
