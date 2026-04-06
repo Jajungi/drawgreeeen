@@ -3,50 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>초록 때리기 (리메이크 완벽판)</title>
+    <title>초록 때리기 (진짜 최종 완벽판)</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* 기본 스타일 */
         body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: #f7f9fc;
-            user-select: none;
-            position: relative;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; margin: 0; font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f7f9fc; user-select: none; position: relative;
         }
-
         .neo-box {
-            background-color: #fff;
-            border-radius: 20px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.05), 0 6px 6px rgba(0,0,0,0.05);
-            padding: 20px;
+            background-color: #fff; border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05), 0 6px 6px rgba(0,0,0,0.05); padding: 20px;
         }
 
         /* 랭킹 섹션 */
-        #ranking-section {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            min-width: 280px;
-        }
-        #ranking-section h3, #ranking-section h4 {
-            margin-top: 0; margin-bottom: 10px; color: #333;
-        }
+        #ranking-section { position: absolute; top: 20px; left: 20px; min-width: 280px; }
+        #ranking-section h3, #ranking-section h4 { margin-top: 0; margin-bottom: 10px; color: #333; }
         #total-pops-display {
-            font-size: 1.8em; font-weight: bold; color: #4caf50;
-            margin-bottom: 15px; border-bottom: 2px solid #e0e0e0;
-            padding-bottom: 10px; display: flex; align-items: center; justify-content: space-between;
+            font-size: 1.8em; font-weight: bold; color: #4caf50; margin-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; display: flex;
+            align-items: center; justify-content: space-between;
         }
         #total-pops-display span:first-child { font-size: 0.7em; color: #666; }
         #total-pops-value { line-height: 1; }
-        #top-10-list {
-            list-style: none; padding: 0; margin: 0; font-size: 1em;
-            max-height: 300px; overflow-y: auto;
-        }
+        #top-10-list { list-style: none; padding: 0; margin: 0; font-size: 1em; max-height: 300px; overflow-y: auto; }
         #top-10-list li {
             margin: 8px 0; display: flex; justify-content: space-between; align-items: center;
             padding: 8px 12px; border-radius: 10px; background-color: #f1f3f5;
@@ -56,31 +36,23 @@
         #top-10-list .rank-pops { color: #007bff; font-weight: bold; }
 
         /* 시작 화면 */
-        #start-screen {
-            display: flex; flex-direction: column; align-items: center; text-align: center; width: 400px;
-        }
+        #start-screen { display: flex; flex-direction: column; align-items: center; text-align: center; width: 400px; }
         #start-screen h2 { margin-bottom: 20px; color: #333; }
         input[type="text"] {
-            padding: 15px; font-size: 1.1em; margin-bottom: 20px;
-            border-radius: 12px; border: 1px solid #ddd; width: 100%; box-sizing: border-box;
-            transition: border-color 0.3s, box-shadow 0.3s;
+            padding: 15px; font-size: 1.1em; margin-bottom: 20px; border-radius: 12px;
+            border: 1px solid #ddd; width: 100%; box-sizing: border-box; transition: 0.3s;
         }
-        input[type="text"]:focus {
-            border-color: #4caf50; box-shadow: 0 0 10px rgba(76, 175, 80, 0.2); outline: none;
-        }
+        input[type="text"]:focus { border-color: #4caf50; box-shadow: 0 0 10px rgba(76, 175, 80, 0.2); outline: none; }
         button {
             padding: 15px 30px; font-size: 1.2em; border-radius: 12px; border: none;
-            cursor: pointer; background-color: #4caf50; color: white; font-weight: bold;
-            transition: background-color 0.3s, transform 0.1s;
+            cursor: pointer; background-color: #4caf50; color: white; font-weight: bold; transition: 0.3s;
         }
         button:hover { background-color: #43a047; }
         button:active { transform: scale(0.98); }
         #start-screen p { margin-top: 25px; color: #777; font-size: 0.95em; }
 
         /* 게임 화면 */
-        #game-screen {
-            display: none; text-align: center; width: 100%; max-width: 600px;
-        }
+        #game-screen { display: none; text-align: center; width: 100%; max-width: 600px; }
         #my-pops-display-wrapper {
             font-size: 4em; font-weight: bold; margin-bottom: 15px; color: #d9534f;
             display: flex; justify-content: center; align-items: center; line-height: 1;
@@ -99,13 +71,11 @@
         /* 숫자 애니메이션 스타일 */
         .digit-container {
             position: relative; overflow: hidden; height: 1.2em; display: inline-block;
-            vertical-align: top; line-height: 1.2; margin: 0; padding: 0; text-align: center;
-            width: 0.6em; box-sizing: border-box; white-space: nowrap;
+            vertical-align: top; line-height: 1.2; margin: 0; padding: 0; text-align: center; width: 0.6em; box-sizing: border-box; white-space: nowrap;
         }
         .digit-number {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; justify-content: center; align-items: center;
-            transition: transform 0.4s ease-in-out; line-height: 1.2; white-space: nowrap;
+            display: flex; justify-content: center; align-items: center; transition: transform 0.3s ease-in-out; line-height: 1.2; white-space: nowrap;
         }
         .digit-number.new { transform: translateY(100%); }
         .digit-number.enter { transform: translateY(0); }
@@ -171,7 +141,7 @@
 
         let currentUserId = null;
         let localPops = 0;
-        let isGameReady = false; // 데이터 로딩 전 클릭 방지 플래그
+        let isGameReady = false; 
         const closedImageSrc = '귀엽다.png'; 
         
         let originalImage = new Image();
@@ -193,20 +163,17 @@
         let rankingsInterval = null;
         const POLLING_INTERVAL = 8000;
 
+        // [버그 3 해결] 1로 덮어씌워지는 현상 방지 (무조건 +1 병합)
         async function incrementTotalPops() {
             try {
-                await db.collection("global_stats").doc("all_pops").update({
+                await db.collection("global_stats").doc("all_pops").set({
                     total_pops: firebase.firestore.FieldValue.increment(1)
-                });
+                }, { merge: true });
             } catch (err) {
-                if (err.code === 'not-found') {
-                    // 혹시라도 문서가 지워지면 1로 재생성
-                    await db.collection("global_stats").doc("all_pops").set({ total_pops: 1 });
-                }
+                console.error("전체 클릭 업데이트 에러:", err);
             }
         }
 
-        // ----------------- 게임 시작 -----------------
         startButton.addEventListener('click', startGame);
 
         async function startGame() {
@@ -219,7 +186,7 @@
             gameScreen.style.display = 'block';
             
             await loadMyPopsInitial();
-            isGameReady = true; // 이제부터 클릭 가능!
+            isGameReady = true; 
         }
 
         async function loadMyPopsInitial() {
@@ -233,12 +200,10 @@
             }
         }
 
-        // ----------------- 클릭 처리 -----------------
         popcatCanvas.addEventListener('mousedown', handlePop);
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && !e.repeat && isGameReady && currentUserId) {
                 e.preventDefault();
-                // 스페이스바 클릭 시 CSS 렌더링 기준 중앙 좌표 전송
                 const centerX = popcatCanvas.clientWidth / 2;
                 const centerY = popcatCanvas.clientHeight / 2;
                 handlePop({ offsetX: centerX, offsetY: centerY });
@@ -246,19 +211,16 @@
         });
 
         async function handlePop(event) {
-            // isGameReady가 false면 무시 (로딩 중 클릭 방지)
             if (!isGameReady || !currentUserId || !originalImageData) return;
 
             localPops++;
+            // 내 클릭 수는 애니메이션 딜레이 없이 즉시 텍스트 변경
             myPopsDisplay.textContent = localPops; 
             myPopsDisplay.dataset.currentValue = localPops; 
 
-            // [수정 포인트] 화면에 보이는 크기와 캔버스 실제 픽셀 크기 비율 계산
             const rect = popcatCanvas.getBoundingClientRect();
             const scaleX = popcatCanvas.width / rect.width;
             const scaleY = popcatCanvas.height / rect.height;
-            
-            // 실제 이미지 내부의 정확한 클릭 좌표로 변환
             const internalX = event.offsetX * scaleX;
             const internalY = event.offsetY * scaleY;
 
@@ -270,12 +232,10 @@
                 db.collection("users").doc(currentUserId).set({
                     pops: firebase.firestore.FieldValue.increment(1)
                 }, { merge: true });
-
                 incrementTotalPops();
             } catch (err) { console.error("클릭 업데이트 실패:", err); }
         }
 
-        // ----------------- 픽셀 밀어내기 효과 -----------------
         function applyDisplacementEffect(centerX, centerY) {
             const imageData = ctx.createImageData(popcatCanvas.width, popcatCanvas.height);
             const data = imageData.data;
@@ -283,17 +243,15 @@
             const width = popcatCanvas.width;
             const height = popcatCanvas.height;
 
-            // [수정 포인트] 이미지 해상도에 맞춰 왜곡 범위와 강도를 동적 조절
             const baseSize = Math.min(width, height);
-            const effectRadius = baseSize * 0.25; // 이미지 크기의 25% 반경
-            const displacementStrength = baseSize * 0.12; // 강도 상향
+            const effectRadius = baseSize * 0.25; 
+            const displacementStrength = baseSize * 0.12; 
 
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const dx = x - centerX;
                     const dy = y - centerY;
                     const dist = Math.sqrt(dx * dx + dy * dy);
-
                     let targetIndex = (y * width + x) * 4;
 
                     if (dist < effectRadius) {
@@ -302,7 +260,6 @@
                         
                         const srcX = Math.floor(x - Math.cos(angle) * strength);
                         const srcY = Math.floor(y - Math.sin(angle) * strength);
-
                         const originalPixelIndex = (srcY * width + srcX) * 4;
 
                         if (originalPixelIndex >= 0 && originalPixelIndex < originalData.length) {
@@ -329,24 +286,31 @@
             }, interval);
         }
 
-        function updateNumberSmooth(element, newValue) {
+        // [버그 1, 2 해결] 애니메이션 충돌 방지 및 안전 장치 추가
+        function updateNumberSmooth(element, newValue, skipAnimation = false) {
             let oldVal = Number(element.dataset.currentValue || "0");
             if (isNaN(oldVal)) oldVal = 0;
             if (oldVal === newValue) return;
 
+            // 진행 중인 타이머 취소 및 즉시 데이터 업데이트 (레이스 컨디션 방지)
+            if (element.timeoutId) clearTimeout(element.timeoutId);
+            element.dataset.currentValue = newValue; 
+
             const oldStr = oldVal.toString();
             const newStr = newValue.toString();
-            const maxLen = Math.max(oldStr.length, newStr.length);
-            let html = "";
 
-            for (let i = 0; i < maxLen; i++) {
-                const oldChar = oldStr[oldStr.length - 1 - i] || " ";
-                const newChar = newStr[newStr.length - 1 - i] || " ";
-                
-                if (oldChar === newChar) {
-                    html = `<span class="digit-container"><span class="digit-number">${newChar}</span></span>` + html;
+            // 처음 로딩이거나, 자릿수가 달라지면 애니메이션 없이 즉시 렌더링 (UI 깨짐 완벽 방지)
+            if (skipAnimation || oldStr.length !== newStr.length) {
+                element.textContent = newValue;
+                return;
+            }
+
+            let html = "";
+            for (let i = 0; i < newStr.length; i++) {
+                if (oldStr[i] === newStr[i]) {
+                    html += `<span class="digit-container"><span class="digit-number">${newStr[i]}</span></span>`;
                 } else {
-                    html = `<span class="digit-container"><span class="digit-number old">${oldChar}</span><span class="digit-number new">${newChar}</span></span>` + html;
+                    html += `<span class="digit-container"><span class="digit-number old">${oldStr[i]}</span><span class="digit-number new">${newStr[i]}</span></span>`;
                 }
             }
 
@@ -362,16 +326,9 @@
                 });
             });
 
-            setTimeout(() => {
-                element.querySelectorAll(".digit-number.old.exit").forEach(e => e.remove());
-                element.querySelectorAll(".digit-number.enter").forEach(e => {
-                    e.classList.remove("enter");
-                    e.className = "digit-number";
-                    e.style.transform = "translateY(0)";
-                });
+            element.timeoutId = setTimeout(() => {
                 element.textContent = newValue; 
-                element.dataset.currentValue = newValue; 
-            }, 400); 
+            }, 300); 
         }
 
         function updateRankList(ranks) {
@@ -388,8 +345,10 @@
                 const popSpanId = `rank-pops-${r.id}`;
                 let li = document.getElementById(listId);
                 let popSpanElement = null;
+                let isNewElement = false;
 
                 if (!li) {
+                    isNewElement = true; // 새롭게 생성된 리스트인지 확인
                     li = document.createElement('li'); li.id = listId;
                     const rankNumSpan = document.createElement('span'); rankNumSpan.className = 'rank-num'; 
                     const rankIdSpan = document.createElement('span'); rankIdSpan.className = 'rank-id';
@@ -410,14 +369,15 @@
 
                 li.querySelector('.rank-num').textContent = `${i + 1}.`;
                 li.querySelector('.rank-id').textContent = r.id; 
-                updateNumberSmooth(popSpanElement, r.pops);
+                
+                // 새로 생긴 랭킹 항목이면 0부터 애니메이션 주지 않고 즉시 표시
+                updateNumberSmooth(popSpanElement, r.pops, isNewElement);
             });
         }
 
         async function updateRankings(initialLoad = false) {
             let totalPops = 0; const ranks = [];
             try {
-                // [수정 포인트] 전역 카운터가 없으면, 1회에 한해 전체 유저 점수를 합산하여 복구 (마이그레이션)
                 const totalDocRef = db.collection("global_stats").doc("all_pops");
                 const totalDoc = await totalDocRef.get();
 
@@ -433,10 +393,8 @@
 
                 const snapshot = await db.collection("users").orderBy("pops", "desc").limit(10).get();
 
-                if (initialLoad) {
-                    totalPopsValue.textContent = '0'; totalPopsValue.dataset.currentValue = '0'; 
-                }
-                updateNumberSmooth(totalPopsValue, totalPops);
+                // 최초 로드 시 애니메이션 생략 (skipAnimation = true)
+                updateNumberSmooth(totalPopsValue, totalPops, initialLoad);
 
                 snapshot.docs.forEach(doc => { ranks.push({ id: doc.id, pops: Number(doc.data().pops) || 0 }); });
                 updateRankList(ranks);
@@ -445,7 +403,6 @@
                 if (initialLoad) {
                     totalPopsValue.textContent = '0'; totalPopsValue.dataset.currentValue = '0'; 
                 }
-                updateNumberSmooth(totalPopsValue, 0);
             }
         }
 
