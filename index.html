@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>초록 때리기 (사운드 추가)</title>
+    <title>초록 때리기 (소리 제어 추가)</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
             display: flex; justify-content: center; align-items: center;
             height: 100vh; margin: 0; font-family: 'Noto Sans KR', sans-serif;
             background-color: #f7f9fc; user-select: none; position: relative;
-            touch-action: none; /* 화면 전체 스크롤 및 확대 방지 */
+            touch-action: none; 
         }
         .neo-box {
             background-color: #fff; border-radius: 20px;
@@ -42,12 +42,12 @@
             border: 1px solid #ddd; width: 100%; box-sizing: border-box; transition: 0.3s;
         }
         input[type="text"]:focus { border-color: #4caf50; box-shadow: 0 0 10px rgba(76, 175, 80, 0.2); outline: none; }
-        button {
+        .main-btn {
             padding: 15px 30px; font-size: 1.2em; border-radius: 12px; border: none;
             cursor: pointer; background-color: #4caf50; color: white; font-weight: bold; transition: 0.3s;
         }
-        button:hover { background-color: #43a047; }
-        button:active { transform: scale(0.98); }
+        .main-btn:hover { background-color: #43a047; }
+        .main-btn:active { transform: scale(0.98); }
         #start-screen p { margin-top: 25px; color: #777; font-size: 0.95em; }
 
         #game-screen { display: none; text-align: center; width: 100%; max-width: 600px; }
@@ -61,13 +61,23 @@
             display: block; margin: 0 auto 20px; width: 350px; height: auto;
             cursor: pointer; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             transition: transform 0.1s;
-            /* 모바일 최적화 CSS */
-            touch-action: manipulation; /* 더블탭 줌 방지 */
-            -webkit-tap-highlight-color: transparent; /* 터치 시 파란색 깜빡임 방지 */
+            touch-action: manipulation; 
+            -webkit-tap-highlight-color: transparent; 
         }
         #popcat-canvas:active { transform: scale(0.98); }
-        .instruction { color:#666; margin-top: 15px; font-size: 1.1em; }
+        .instruction { color:#666; margin-top: 15px; font-size: 1.1em; margin-bottom: 15px; }
         .instruction strong { color: #333; text-decoration: underline; }
+
+        /* 소리 끄기/켜기 버튼 스타일 */
+        #sound-toggle-btn {
+            padding: 10px 20px; font-size: 0.95em; border-radius: 20px;
+            background-color: #f1f3f5; color: #555; border: none; cursor: pointer;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.05), inset -2px -2px 5px #fff;
+            transition: 0.2s; font-family: inherit; outline: none;
+        }
+        #sound-toggle-btn:hover { background-color: #e2e6ea; }
+        #sound-toggle-btn:active { transform: scale(0.95); }
+        #sound-toggle-btn.muted { color: #d9534f; } /* 음소거 시 빨간색 텍스트 */
 
         .digit-container {
             position: relative; overflow: hidden; height: 1.2em; display: inline-block;
@@ -103,7 +113,7 @@
     <div id="start-screen" class="neo-box">
         <h2>🌿 초록 때리기 🌿</h2>
         <input type="text" id="user-id" placeholder="나만의 멋진 ID를 입력하세요!">
-        <button id="start-button">게임 시작!</button>
+        <button id="start-button" class="main-btn">게임 시작!</button>
         <p>* 클릭 횟수는 입력한 ID에 누적됩니다.</p>
     </div>
 
@@ -114,6 +124,8 @@
         </div>
         <canvas id="popcat-canvas" width="300" height="300"></canvas> 
         <div class="instruction">당신의 ID: <strong id="current-user-id"></strong></div>
+        
+        <button id="sound-toggle-btn">🔊 소리 켜짐</button>
     </div>
 
     <script>
@@ -138,13 +150,16 @@
         const userIdInput = document.getElementById('user-id');
         const startButton = document.getElementById('start-button');
         const currentUserDisplay = document.getElementById('current-user-id');
+        
+        // [추가됨] 사운드 제어용 변수 및 버튼
+        const soundToggleBtn = document.getElementById('sound-toggle-btn');
+        let isSoundMuted = false; 
 
         let currentUserId = null;
         let localPops = 0;
         let isGameReady = false; 
         const closedImageSrc = '귀엽다.png'; 
         
-        // 🎵 오디오 객체 세팅 (준비하신 음성 파일명으로 수정하세요!)
         const popAudio = new Audio('pop.mp3'); 
 
         let originalImage = new Image();
@@ -178,6 +193,20 @@
 
         startButton.addEventListener('click', startGame);
 
+        // [추가됨] 소리 켜기/끄기 버튼 이벤트
+        soundToggleBtn.addEventListener('click', () => {
+            isSoundMuted = !isSoundMuted; // 상태 반전 (true <-> false)
+            if (isSoundMuted) {
+                soundToggleBtn.textContent = '🔇 소리 꺼짐';
+                soundToggleBtn.classList.add('muted');
+            } else {
+                soundToggleBtn.textContent = '🔊 소리 켜짐';
+                soundToggleBtn.classList.remove('muted');
+            }
+            // 포커스 해제 (스페이스바 연타 시 버튼이 눌리는 현상 방지)
+            soundToggleBtn.blur();
+        });
+
         async function startGame() {
             const userId = userIdInput.value.trim();
             if (!userId) return alert("ID를 입력해 주세요.");
@@ -200,46 +229,39 @@
             } catch (err) { console.error("내 클릭 수 로드 에러:", err); }
         }
 
-        // 🎵 소리 재생 함수 (광클 시 겹쳐서 재생되도록 클론 생성)
         function playPopSound() {
-            if (!popAudio.src) return;
+            // [수정됨] 음소거 상태(isSoundMuted)가 true면 재생 안 하고 바로 종료
+            if (isSoundMuted || !popAudio.src) return; 
             const soundClone = popAudio.cloneNode();
-            soundClone.volume = 0.6; // 필요에 따라 볼륨 조절 (0.0 ~ 1.0)
+            soundClone.volume = 0.6; 
             soundClone.play().catch(e => console.log("오디오 자동재생 방지됨:", e));
         }
 
-        // 📱 PC 클릭 & 모바일 터치 통합 핸들러
         function handleInteraction(e) {
             if (!isGameReady || !currentUserId || !originalImageData) return;
-            
-            // 모바일에서 더블탭 줌, 스크롤 등 기본 동작 완벽 차단
             e.preventDefault(); 
 
             const rect = popcatCanvas.getBoundingClientRect();
             const scaleX = popcatCanvas.width / rect.width;
             const scaleY = popcatCanvas.height / rect.height;
 
-            // 터치 이벤트(모바일)인 경우 - 멀티터치 지원!
             if (e.type === 'touchstart') {
                 for (let i = 0; i < e.changedTouches.length; i++) {
                     const clientX = e.changedTouches[i].clientX;
                     const clientY = e.changedTouches[i].clientY;
                     processClick(clientX, clientY, rect, scaleX, scaleY);
                 }
-            } 
-            // 마우스 이벤트(PC)인 경우
-            else {
+            } else {
                 processClick(e.clientX, e.clientY, rect, scaleX, scaleY);
             }
         }
 
-        // 실제 클릭 로직 처리
         function processClick(clientX, clientY, rect, scaleX, scaleY) {
             localPops++;
             myPopsDisplay.textContent = localPops; 
             myPopsDisplay.dataset.currentValue = localPops; 
 
-            playPopSound(); // 🎵 찰진 소리 재생!
+            playPopSound(); 
 
             const internalX = (clientX - rect.left) * scaleX;
             const internalY = (clientY - rect.top) * scaleY;
@@ -255,26 +277,21 @@
             } catch (err) { console.error("클릭 업데이트 실패:", err); }
         }
 
-        // 이벤트 리스너 등록 (터치와 마우스 모두 감지)
         popcatCanvas.addEventListener('mousedown', handleInteraction);
-        // passive: false 옵션을 줘야 모바일에서 e.preventDefault()가 정상 작동합니다.
         popcatCanvas.addEventListener('touchstart', handleInteraction, { passive: false }); 
 
-        // 스페이스바 지원
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && !e.repeat && isGameReady && currentUserId) {
                 e.preventDefault();
                 const rect = popcatCanvas.getBoundingClientRect();
                 const scaleX = popcatCanvas.width / rect.width;
                 const scaleY = popcatCanvas.height / rect.height;
-                // 스페이스바는 중앙 클릭으로 간주
                 const clientX = rect.left + (rect.width / 2);
                 const clientY = rect.top + (rect.height / 2);
                 processClick(clientX, clientY, rect, scaleX, scaleY);
             }
         });
 
-        // ----------------- 픽셀 밀어내기 및 기타 함수 (동일) -----------------
         function applyDisplacementEffect(centerX, centerY) {
             const imageData = ctx.createImageData(popcatCanvas.width, popcatCanvas.height);
             const data = imageData.data;
