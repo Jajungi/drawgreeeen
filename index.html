@@ -375,25 +375,38 @@
             });
         }
 
+        // ----------------- 순위 및 전체 클릭 수 (강제 동기화 기능 추가) -----------------
         async function updateRankings(initialLoad = false) {
             let totalPops = 0; const ranks = [];
             try {
                 const totalDocRef = db.collection("global_stats").doc("all_pops");
                 const totalDoc = await totalDocRef.get();
+                totalPops = totalDoc.exists ? (Number(totalDoc.data().total_pops) || 0) : 0;
 
-                if (!totalDoc.exists) {
+                // 1. 먼저 TOP 10 유저 데이터를 가져옵니다.
+                const snapshot = await db.collection("users").orderBy("pops", "desc").limit(10).get();
+                
+                // 2. 1등의 점수를 확인합니다.
+                let top1Pops = 0;
+                if (!snapshot.empty) {
+                    top1Pops = Number(snapshot.docs[0].data().pops) || 0;
+                }
+
+                // 3. [핵심] 전체 점수가 1등 점수보다 낮으면 꼬인 것으로 판단! 전체 재계산 실행
+                if (!totalDoc.exists || totalPops < top1Pops) {
+                    console.log("🔥 데이터 싱크 오류 감지! 전체 클릭 수를 강제 재계산합니다...");
                     const allUsers = await db.collection("users").get();
                     let sum = 0;
                     allUsers.docs.forEach(d => { sum += Number(d.data().pops) || 0; });
-                    await totalDocRef.set({ total_pops: sum });
+                    
+                    await totalDocRef.set({ total_pops: sum }); // 계산된 진짜 총합으로 덮어쓰기
                     totalPops = sum;
-                } else {
-                    totalPops = Number(totalDoc.data().total_pops) || 0;
                 }
 
-                const snapshot = await db.collection("users").orderBy("pops", "desc").limit(10).get();
-
-                // 최초 로드 시 애니메이션 생략 (skipAnimation = true)
+                // 4. 화면에 값 업데이트
+                if (initialLoad) {
+                    totalPopsValue.textContent = '0'; totalPopsValue.dataset.currentValue = '0'; 
+                }
                 updateNumberSmooth(totalPopsValue, totalPops, initialLoad);
 
                 snapshot.docs.forEach(doc => { ranks.push({ id: doc.id, pops: Number(doc.data().pops) || 0 }); });
