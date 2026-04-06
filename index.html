@@ -2,21 +2,21 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>초록 때리기 (진짜 최종 완벽판)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>초록 때리기 (모바일 광클 & 사운드 추가)</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
             display: flex; justify-content: center; align-items: center;
             height: 100vh; margin: 0; font-family: 'Noto Sans KR', sans-serif;
             background-color: #f7f9fc; user-select: none; position: relative;
+            touch-action: none; /* 화면 전체 스크롤 및 확대 방지 */
         }
         .neo-box {
             background-color: #fff; border-radius: 20px;
             box-shadow: 0 10px 20px rgba(0,0,0,0.05), 0 6px 6px rgba(0,0,0,0.05); padding: 20px;
         }
 
-        /* 랭킹 섹션 */
         #ranking-section { position: absolute; top: 20px; left: 20px; min-width: 280px; }
         #ranking-section h3, #ranking-section h4 { margin-top: 0; margin-bottom: 10px; color: #333; }
         #total-pops-display {
@@ -35,7 +35,6 @@
         #top-10-list .rank-id { flex-grow: 1; margin-left: 10px; color: #444; }
         #top-10-list .rank-pops { color: #007bff; font-weight: bold; }
 
-        /* 시작 화면 */
         #start-screen { display: flex; flex-direction: column; align-items: center; text-align: center; width: 400px; }
         #start-screen h2 { margin-bottom: 20px; color: #333; }
         input[type="text"] {
@@ -51,7 +50,6 @@
         button:active { transform: scale(0.98); }
         #start-screen p { margin-top: 25px; color: #777; font-size: 0.95em; }
 
-        /* 게임 화면 */
         #game-screen { display: none; text-align: center; width: 100%; max-width: 600px; }
         #my-pops-display-wrapper {
             font-size: 4em; font-weight: bold; margin-bottom: 15px; color: #d9534f;
@@ -63,12 +61,14 @@
             display: block; margin: 0 auto 20px; width: 350px; height: auto;
             cursor: pointer; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             transition: transform 0.1s;
+            /* 모바일 최적화 CSS */
+            touch-action: manipulation; /* 더블탭 줌 방지 */
+            -webkit-tap-highlight-color: transparent; /* 터치 시 파란색 깜빡임 방지 */
         }
         #popcat-canvas:active { transform: scale(0.98); }
         .instruction { color:#666; margin-top: 15px; font-size: 1.1em; }
         .instruction strong { color: #333; text-decoration: underline; }
 
-        /* 숫자 애니메이션 스타일 */
         .digit-container {
             position: relative; overflow: hidden; height: 1.2em; display: inline-block;
             vertical-align: top; line-height: 1.2; margin: 0; padding: 0; text-align: center; width: 0.6em; box-sizing: border-box; white-space: nowrap;
@@ -144,6 +144,9 @@
         let isGameReady = false; 
         const closedImageSrc = '귀엽다.png'; 
         
+        // 🎵 오디오 객체 세팅 (준비하신 음성 파일명으로 수정하세요!)
+        const popAudio = new Audio('pop.mp3'); 
+
         let originalImage = new Image();
         let originalImageData = null;
 
@@ -163,7 +166,6 @@
         let rankingsInterval = null;
         const POLLING_INTERVAL = 8000;
 
-        // [버그 3 해결] 1로 덮어씌워지는 현상 방지 (무조건 +1 병합)
         async function incrementTotalPops() {
             try {
                 await db.collection("global_stats").doc("all_pops").set({
@@ -195,37 +197,54 @@
                 localPops = doc.exists ? Number(doc.data().pops) || 0 : 0;
                 myPopsDisplay.textContent = localPops;
                 myPopsDisplay.dataset.currentValue = localPops; 
-            } catch (err) {
-                console.error("내 클릭 수 로드 에러:", err);
-            }
+            } catch (err) { console.error("내 클릭 수 로드 에러:", err); }
         }
 
-        popcatCanvas.addEventListener('mousedown', handlePop);
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && !e.repeat && isGameReady && currentUserId) {
-                e.preventDefault();
-                const centerX = popcatCanvas.clientWidth / 2;
-                const centerY = popcatCanvas.clientHeight / 2;
-                handlePop({ offsetX: centerX, offsetY: centerY });
-            }
-        });
+        // 🎵 소리 재생 함수 (광클 시 겹쳐서 재생되도록 클론 생성)
+        function playPopSound() {
+            if (!popAudio.src) return;
+            const soundClone = popAudio.cloneNode();
+            soundClone.volume = 0.6; // 필요에 따라 볼륨 조절 (0.0 ~ 1.0)
+            soundClone.play().catch(e => console.log("오디오 자동재생 방지됨:", e));
+        }
 
-        async function handlePop(event) {
+        // 📱 PC 클릭 & 모바일 터치 통합 핸들러
+        function handleInteraction(e) {
             if (!isGameReady || !currentUserId || !originalImageData) return;
-
-            localPops++;
-            // 내 클릭 수는 애니메이션 딜레이 없이 즉시 텍스트 변경
-            myPopsDisplay.textContent = localPops; 
-            myPopsDisplay.dataset.currentValue = localPops; 
+            
+            // 모바일에서 더블탭 줌, 스크롤 등 기본 동작 완벽 차단
+            e.preventDefault(); 
 
             const rect = popcatCanvas.getBoundingClientRect();
             const scaleX = popcatCanvas.width / rect.width;
             const scaleY = popcatCanvas.height / rect.height;
-            const internalX = event.offsetX * scaleX;
-            const internalY = event.offsetY * scaleY;
+
+            // 터치 이벤트(모바일)인 경우 - 멀티터치 지원!
+            if (e.type === 'touchstart') {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const clientX = e.changedTouches[i].clientX;
+                    const clientY = e.changedTouches[i].clientY;
+                    processClick(clientX, clientY, rect, scaleX, scaleY);
+                }
+            } 
+            // 마우스 이벤트(PC)인 경우
+            else {
+                processClick(e.clientX, e.clientY, rect, scaleX, scaleY);
+            }
+        }
+
+        // 실제 클릭 로직 처리
+        function processClick(clientX, clientY, rect, scaleX, scaleY) {
+            localPops++;
+            myPopsDisplay.textContent = localPops; 
+            myPopsDisplay.dataset.currentValue = localPops; 
+
+            playPopSound(); // 🎵 찰진 소리 재생!
+
+            const internalX = (clientX - rect.left) * scaleX;
+            const internalY = (clientY - rect.top) * scaleY;
 
             applyDisplacementEffect(internalX, internalY);
-
             setTimeout(() => { drawOriginalImage(); }, 120);
 
             try {
@@ -236,6 +255,26 @@
             } catch (err) { console.error("클릭 업데이트 실패:", err); }
         }
 
+        // 이벤트 리스너 등록 (터치와 마우스 모두 감지)
+        popcatCanvas.addEventListener('mousedown', handleInteraction);
+        // passive: false 옵션을 줘야 모바일에서 e.preventDefault()가 정상 작동합니다.
+        popcatCanvas.addEventListener('touchstart', handleInteraction, { passive: false }); 
+
+        // 스페이스바 지원
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !e.repeat && isGameReady && currentUserId) {
+                e.preventDefault();
+                const rect = popcatCanvas.getBoundingClientRect();
+                const scaleX = popcatCanvas.width / rect.width;
+                const scaleY = popcatCanvas.height / rect.height;
+                // 스페이스바는 중앙 클릭으로 간주
+                const clientX = rect.left + (rect.width / 2);
+                const clientY = rect.top + (rect.height / 2);
+                processClick(clientX, clientY, rect, scaleX, scaleY);
+            }
+        });
+
+        // ----------------- 픽셀 밀어내기 및 기타 함수 (동일) -----------------
         function applyDisplacementEffect(centerX, centerY) {
             const imageData = ctx.createImageData(popcatCanvas.width, popcatCanvas.height);
             const data = imageData.data;
@@ -281,25 +320,20 @@
 
         function startPolling(interval) {
             if (rankingsInterval) clearInterval(rankingsInterval);
-            rankingsInterval = setInterval(async () => {
-                await updateRankings();
-            }, interval);
+            rankingsInterval = setInterval(async () => { await updateRankings(); }, interval);
         }
 
-        // [버그 1, 2 해결] 애니메이션 충돌 방지 및 안전 장치 추가
         function updateNumberSmooth(element, newValue, skipAnimation = false) {
             let oldVal = Number(element.dataset.currentValue || "0");
             if (isNaN(oldVal)) oldVal = 0;
             if (oldVal === newValue) return;
 
-            // 진행 중인 타이머 취소 및 즉시 데이터 업데이트 (레이스 컨디션 방지)
             if (element.timeoutId) clearTimeout(element.timeoutId);
             element.dataset.currentValue = newValue; 
 
             const oldStr = oldVal.toString();
             const newStr = newValue.toString();
 
-            // 처음 로딩이거나, 자릿수가 달라지면 애니메이션 없이 즉시 렌더링 (UI 깨짐 완벽 방지)
             if (skipAnimation || oldStr.length !== newStr.length) {
                 element.textContent = newValue;
                 return;
@@ -326,9 +360,7 @@
                 });
             });
 
-            element.timeoutId = setTimeout(() => {
-                element.textContent = newValue; 
-            }, 300); 
+            element.timeoutId = setTimeout(() => { element.textContent = newValue; }, 300); 
         }
 
         function updateRankList(ranks) {
@@ -348,7 +380,7 @@
                 let isNewElement = false;
 
                 if (!li) {
-                    isNewElement = true; // 새롭게 생성된 리스트인지 확인
+                    isNewElement = true;
                     li = document.createElement('li'); li.id = listId;
                     const rankNumSpan = document.createElement('span'); rankNumSpan.className = 'rank-num'; 
                     const rankIdSpan = document.createElement('span'); rankIdSpan.className = 'rank-id';
@@ -369,13 +401,10 @@
 
                 li.querySelector('.rank-num').textContent = `${i + 1}.`;
                 li.querySelector('.rank-id').textContent = r.id; 
-                
-                // 새로 생긴 랭킹 항목이면 0부터 애니메이션 주지 않고 즉시 표시
                 updateNumberSmooth(popSpanElement, r.pops, isNewElement);
             });
         }
 
-        // ----------------- 순위 및 전체 클릭 수 (강제 동기화 기능 추가) -----------------
         async function updateRankings(initialLoad = false) {
             let totalPops = 0; const ranks = [];
             try {
@@ -383,27 +412,19 @@
                 const totalDoc = await totalDocRef.get();
                 totalPops = totalDoc.exists ? (Number(totalDoc.data().total_pops) || 0) : 0;
 
-                // 1. 먼저 TOP 10 유저 데이터를 가져옵니다.
                 const snapshot = await db.collection("users").orderBy("pops", "desc").limit(10).get();
                 
-                // 2. 1등의 점수를 확인합니다.
                 let top1Pops = 0;
-                if (!snapshot.empty) {
-                    top1Pops = Number(snapshot.docs[0].data().pops) || 0;
-                }
+                if (!snapshot.empty) top1Pops = Number(snapshot.docs[0].data().pops) || 0;
 
-                // 3. [핵심] 전체 점수가 1등 점수보다 낮으면 꼬인 것으로 판단! 전체 재계산 실행
                 if (!totalDoc.exists || totalPops < top1Pops) {
-                    console.log("🔥 데이터 싱크 오류 감지! 전체 클릭 수를 강제 재계산합니다...");
                     const allUsers = await db.collection("users").get();
                     let sum = 0;
                     allUsers.docs.forEach(d => { sum += Number(d.data().pops) || 0; });
-                    
-                    await totalDocRef.set({ total_pops: sum }); // 계산된 진짜 총합으로 덮어쓰기
+                    await totalDocRef.set({ total_pops: sum }); 
                     totalPops = sum;
                 }
 
-                // 4. 화면에 값 업데이트
                 if (initialLoad) {
                     totalPopsValue.textContent = '0'; totalPopsValue.dataset.currentValue = '0'; 
                 }
